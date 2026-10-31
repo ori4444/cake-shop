@@ -349,10 +349,12 @@ function Admin({ reload }) {
  const change=async(id,status)=>{try{await changeOrder(id,status);await refresh()}catch(err){setError(err.message)}};
  const save=async e=>{e.preventDefault();setBusy(true);setError('');try{if(!file)throw Error('יש לבחור תמונה למוצר');const image=await uploadImage(file);await saveProduct({...form,description:'',image});setForm({name:'',categoryId:'yeast',price:'',image:''});setFile(null);await refresh();setScreen('home')}catch(err){setError(err.message)}finally{setBusy(false)}};
  const remove=async id=>{if(!window.confirm('למחוק את המוצר?'))return;try{await disableProduct(id);await refresh()}catch(err){setError(err.message)}};
+ if(checking)return <section className="admin-page">טוענים…</section>;
+ if(!user)return <section className="admin-page admin-login-page"><div className="admin-login"><h1>כניסה למנהלת</h1><form onSubmit={login}><label className="field-label">אימייל</label><input type="email" required value={email} onChange={e=>setEmail(e.target.value)}/><label className="field-label">סיסמה</label><input type="password" required value={password} onChange={e=>setPassword(e.target.value)}/>{error&&<p className="error-msg">{error}</p>}<button className="button primary full" disabled={busy}>כניסה</button></form></div></section>;
  return <section className="admin-page">
  {screen!=='home'&&<button className="button outline" onClick={()=>{setScreen('home');setError('')}}>חזרה</button>}
  {error&&<p className="error-msg">{error}</p>}
- {!user&&screen!=='home'&&<p>הפעולות המחוברות למסד דורשות חיבור מנהלת מאובטח.</p>}
+
  {screen==='home'&&<div className="admin-three-actions">
  <button onClick={()=>setScreen('orders')}>הזמנות</button>
  <button onClick={()=>setScreen('add')}>הוספת מוצר</button>
