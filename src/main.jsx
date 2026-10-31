@@ -41,7 +41,7 @@ function App() {
   const count = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   return <>
-    {!window.location.pathname.startsWith("/admin") && <Header />}
+    
     <main className="main">
       <RoutesView {...shop} cart={cart} setCart={setCart} addToCart={addToCart}
         removeFromCart={removeFromCart} changeQuantity={changeQuantity} />
@@ -57,7 +57,6 @@ function App() {
 
 function Header() {
   return <header className="header"><div className="header-inner">
-    <Link to="/" className="brand"><span><b>פירורים של אהבה</b></span></Link>
   </div></header>;
 }
 
