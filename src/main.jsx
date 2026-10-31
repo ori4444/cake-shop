@@ -302,44 +302,35 @@ function Checkout({ cart, setCart, changeQuantity, removeFromCart }) {
 }
 
 function Admin({ reload }) {
- const [user,setUser]=useState(null);
- const [checking,setChecking]=useState(true);
- const [email,setEmail]=useState('');
- const [password,setPassword]=useState('');
- const [error,setError]=useState('');
- const [orders,setOrders]=useState([]);
- const [products,setProducts]=useState([]);
- const [tab,setTab]=useState('orders');
- const [busy,setBusy]=useState(false);
- const [form,setForm]=useState({name:'',categoryId:'yeast',price:'',description:'',image:''});
- const [file,setFile]=useState(null);
- const [editing,setEditing]=useState(null);
+ const [user,setUser]=useState(null),[checking,setChecking]=useState(true);
+ const [email,setEmail]=useState(''),[password,setPassword]=useState('');
+ const [error,setError]=useState(''),[orders,setOrders]=useState([]),[products,setProducts]=useState([]);
+ const [screen,setScreen]=useState('home'),[busy,setBusy]=useState(false),[category,setCategory]=useState('yeast');
+ const [form,setForm]=useState({name:'',categoryId:'yeast',price:'',image:''}),[file,setFile]=useState(null);
  const refresh=async()=>{const [o,p]=await Promise.all([getOrders(),getProducts()]);setOrders(o);setProducts(p);await reload()};
  useEffect(()=>{isAdmin().then(ok=>{if(ok){setUser(authUser());refresh().catch(e=>setError(e.message))}}).finally(()=>setChecking(false))},[]);
  const login=async e=>{e.preventDefault();setBusy(true);setError('');try{setUser(await signIn(email,password));await refresh()}catch(err){setError(err.message)}finally{setBusy(false)}};
  const change=async(id,status)=>{try{await changeOrder(id,status);await refresh()}catch(err){setError(err.message)}};
- const save=async e=>{e.preventDefault();setBusy(true);setError('');try{let image=form.image;if(file)image=await uploadImage(file);await saveProduct({...form,image},editing);setForm({name:'',categoryId:'yeast',price:'',description:'',image:''});setEditing(null);setFile(null);await refresh()}catch(err){setError(err.message)}finally{setBusy(false)}};
- const remove=async id=>{if(!window.confirm('להסיר את המוצר?'))return;try{await disableProduct(id);await refresh()}catch(err){setError(err.message)}};
+ const save=async e=>{e.preventDefault();setBusy(true);setError('');try{if(!file)throw Error('יש לבחור תמונה למוצר');const image=await uploadImage(file);await saveProduct({...form,description:'',image});setForm({name:'',categoryId:'yeast',price:'',image:''});setFile(null);await refresh();setScreen('home')}catch(err){setError(err.message)}finally{setBusy(false)}};
+ const remove=async id=>{if(!window.confirm('למחוק את המוצר?'))return;try{await disableProduct(id);await refresh()}catch(err){setError(err.message)}};
  if(checking)return <section className="admin-page">בודקים הרשאות…</section>;
- if(!user)return <section className="admin-page admin-login-page"><div className="admin-login"><h1>כניסה לניהול</h1><form onSubmit={login}>
- <label className="field-label">אימייל</label><input type="email" required value={email} onChange={e=>setEmail(e.target.value)}/>
- <label className="field-label">סיסמה</label><input type="password" required value={password} onChange={e=>setPassword(e.target.value)}/>
- {error&&<p className="error-msg">{error}</p>}<button className="button primary full" disabled={busy}>התחברות</button></form></div></section>;
- return <section className="admin-page"><div className="admin-top"><h2>ניהול הקונדיטוריה</h2><button className="button outline" onClick={()=>{signOut();setUser(null)}}>יציאה</button></div>
- <div className="admin-tabs"><button onClick={()=>setTab('orders')}>הזמנות ({orders.length})</button><button onClick={()=>setTab('products')}>מוצרים ({products.length})</button></div>
+ if(!user)return <section className="admin-page admin-login-page"><div className="admin-login"><h1>כניסה לניהול</h1><form onSubmit={login}><label className="field-label">אימייל</label><input type="email" required value={email} onChange={e=>setEmail(e.target.value)}/><label className="field-label">סיסמה</label><input type="password" required value={password} onChange={e=>setPassword(e.target.value)}/>{error&&<p className="error-msg">{error}</p>}<button className="button primary full" disabled={busy}>התחברות</button></form></div></section>;
+ return <section className="admin-page">
+ {screen!=='home'&&<button className="button outline" onClick={()=>{setScreen('home');setError('')}}>חזרה</button>}
  {error&&<p className="error-msg">{error}</p>}
- {tab==='orders'?<div>{orders.length===0?<p>אין הזמנות עדיין</p>:orders.map(o=><div key={o.id} className="admin-order">
- <h3>{o.customer_name} — {o.phone}</h3><small>{new Date(o.created_at).toLocaleString('he-IL')} · {o.requested_date||'ללא תאריך מבוקש'}</small>
- <div>{(o.items||[]).map((item,i)=><p key={i}>{item.name} × {item.quantity} {item.note&&' — '+item.note} {item.description&&' — '+item.description}</p>)}</div>
- <b>{money(o.total)}</b><select value={o.status} onChange={e=>change(o.id,e.target.value)}><option value="new">חדשה</option><option value="confirmed">אושרה</option><option value="preparing">בהכנה</option><option value="completed">הושלמה</option><option value="cancelled">בוטלה</option></select></div>)}</div>:
- <div><form className="admin-product-form" onSubmit={save}><h3>{editing?'עריכת מוצר':'הוספת מוצר'}</h3>
+ {screen==='home'&&<div className="admin-three-actions">
+ <button onClick={()=>setScreen('orders')}>הזמנות</button>
+ <button onClick={()=>setScreen('add')}>הוספת מוצר</button>
+ <button onClick={()=>setScreen('delete')}>מחיקת מוצר</button>
+ </div>}
+ {screen==='orders'&&<div><h2>הזמנות</h2>{orders.length===0?<p>אין הזמנות עדיין</p>:orders.map(o=><article key={o.id} className="admin-order"><h3>{o.customer_name} — {o.phone}</h3><small>{new Date(o.created_at).toLocaleDateString('he-IL')} · {o.requested_date||'ללא תאריך מבוקש'}</small><div>{(o.items||[]).map((item,i)=><p key={i}>{item.name} × {item.quantity}{item.note&&' — '+item.note}{item.description&&' — '+item.description}</p>)}</div><b>{money(o.total)}</b><select value={o.status} onChange={e=>change(o.id,e.target.value)}><option value="new">חדשה</option><option value="confirmed">אושרה</option><option value="preparing">בהכנה</option><option value="completed">הושלמה</option><option value="cancelled">בוטלה</option></select></article>)}</div>}
+ {screen==='add'&&<form className="admin-product-form" onSubmit={save}><h2>הוספת מוצר</h2>
  <label className="field-label">שם מוצר</label><input required value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/>
  <label className="field-label">קטגוריה</label><select value={form.categoryId} onChange={e=>setForm({...form,categoryId:e.target.value})}>{categories.filter(c=>c.id!=='custom').map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
  <label className="field-label">מחיר</label><input type="number" min="0" required value={form.price} onChange={e=>setForm({...form,price:e.target.value})}/>
- <label className="field-label">תיאור</label><textarea value={form.description} onChange={e=>setForm({...form,description:e.target.value})}/>
- <label className="field-label">תמונה</label><input type="file" accept="image/jpeg,image/png,image/webp" onChange={e=>setFile(e.target.files?.[0]||null)}/>
- <button className="button primary" disabled={busy}>שמירה</button></form>
- <div className="admin-products">{products.map(p=><div className="cart-row" key={p.id}><img src={p.image}/><div className="cart-item-copy"><b>{p.name}</b><small>{money(p.price)}</small></div><button onClick={()=>{setEditing(p.id);setForm({name:p.name,categoryId:p.categoryId,price:String(p.price),description:p.description,image:p.image});window.scrollTo(0,0)}}>עריכה</button><button onClick={()=>remove(p.id)}>הסרה</button></div>)}</div></div>}
+ <label className="field-label">תמונה</label><input type="file" accept="image/jpeg,image/png,image/webp" required onChange={e=>setFile(e.target.files?.[0]||null)}/>
+ <button className="button primary" disabled={busy}>שמירה</button></form>}
+ {screen==='delete'&&<div><h2>מחיקת מוצר</h2><label className="field-label">קטגוריה</label><select value={category} onChange={e=>setCategory(e.target.value)}>{categories.filter(c=>c.id!=='custom').map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><div className="admin-products">{products.filter(p=>p.categoryId===category).map(p=><div className="cart-row" key={p.id}><img src={p.image} alt=""/><div className="cart-item-copy"><b>{p.name}</b><small>{money(p.price)}</small></div><button className="button outline" onClick={()=>remove(p.id)}>מחיקה</button></div>)}</div></div>}
  </section>;
 }
 
