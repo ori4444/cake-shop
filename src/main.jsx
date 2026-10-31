@@ -60,10 +60,29 @@ function Header() {
   </div></header>;
 }
 
+function AdminInstallGate({children}) {
+ const [installed,setInstalled]=useState(()=>window.matchMedia('(display-mode: standalone)').matches || navigator.standalone===true);
+ const [prompt,setPrompt]=useState(null);
+ useEffect(()=>{
+  const onPrompt=e=>{e.preventDefault();setPrompt(e)};
+  const onInstalled=()=>setInstalled(true);
+  window.addEventListener('beforeinstallprompt',onPrompt);
+  window.addEventListener('appinstalled',onInstalled);
+  return ()=>{window.removeEventListener('beforeinstallprompt',onPrompt);window.removeEventListener('appinstalled',onInstalled)};
+ },[]);
+ if(installed)return children;
+ return <section className="admin-install-gate"><div className="admin-install-box">
+  <h1>התקנת האפליקציה</h1>
+  <p>כדי לפתוח את הניהול יש להתקין את האפליקציה ולפתוח אותה ממסך הבית.</p>
+  {prompt?<button className="button primary" onClick={()=>prompt.prompt()}>התקנת האפליקציה</button>:
+  <p>באייפון: Safari ← שיתוף ← הוסף למסך הבית.<br/>באנדרואיד: Chrome ← ⋮ ← התקנת אפליקציה או הוסף למסך הבית.</p>}
+ </div></section>;
+}
+
 function RoutesView(props) {
   const loc = useLocation();
   useEffect(() => window.scrollTo(0, 0), [loc.pathname]);
-  if (loc.pathname.startsWith('/admin')) return <Admin {...props} />;
+  if (loc.pathname.startsWith('/admin')) return <AdminInstallGate><Admin {...props} /></AdminInstallGate>;
   if (loc.pathname === '/checkout') return <Checkout {...props} />;
   if (loc.pathname === '/custom') return <Custom {...props} />;
   if (loc.pathname.startsWith('/category/')) return <Category {...props} />;
