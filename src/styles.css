@@ -11,3 +11,5 @@
 .home-categories .category-card{height:300px;border-radius:10px}
 .home-categories .category-copy h2{font-size:23px;font-weight:600;margin:0;color:white}
 @media(max-width:700px){.home-categories{padding-top:25px}.home-categories .category-card{height:210px}.home-categories .category-copy h2{font-size:18px}}
+
+.admin-three-actions{display:grid;gap:20px;max-width:500px;margin:8vh auto}.admin-three-actions button{min-height:105px;border:1px solid #d5c6b8;border-radius:14px;background:#fff;font:inherit;font-size:24px;font-weight:600;cursor:pointer}.admin-three-actions button:active{transform:scale(.99)}
