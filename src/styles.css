@@ -13,3 +13,22 @@
 @media(max-width:700px){.home-categories{padding-top:25px}.home-categories .category-card{height:210px}.home-categories .category-copy h2{font-size:18px}}
 
 .admin-three-actions{display:grid;gap:20px;max-width:500px;margin:8vh auto}.admin-three-actions button{min-height:105px;border:1px solid #d5c6b8;border-radius:14px;background:#fff;font:inherit;font-size:24px;font-weight:600;cursor:pointer}.admin-three-actions button:active{transform:scale(.99)}
+
+/* Centered catalog and admin form */
+.admin-page{max-width:1100px;margin:0 auto;width:100%;box-sizing:border-box}
+.admin-product-form{display:flex!important;flex-direction:column!important;gap:12px!important;width:min(100%,460px)!important;max-width:460px!important;margin:36px auto 70px!important;padding:28px!important;box-sizing:border-box;background:#fffdf9;border:1px solid var(--line);border-radius:14px}
+.admin-product-form h2{text-align:center;margin:0 0 12px;font-size:26px}
+.admin-product-form .field-label{display:block;width:100%;margin:0;text-align:right;font-size:13px}
+.admin-product-form input,.admin-product-form select{display:block;box-sizing:border-box;width:100%;min-height:46px;margin:0;font-size:15px}
+.admin-product-form input[type=file]{padding:10px;border:1px solid var(--line);background:white;direction:rtl;min-height:54px}
+.admin-product-form .button{width:100%;min-height:48px;margin-top:12px}
+.listing{max-width:1120px;width:100%;margin:0 auto;box-sizing:border-box}
+.listing-head{display:flex;justify-content:center;align-items:center;text-align:center;margin:10px auto 32px}
+.listing-head h1{margin:0;text-align:center}
+.listing .product-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:22px;max-width:1060px;margin:0 auto}
+.listing .product-card{min-width:0;text-align:center}
+.listing .product-info{text-align:center}
+.listing .product-info h3,.listing .product-info p{text-align:center}
+.home-categories .category-grid{max-width:1120px;margin:0 auto}
+@media(max-width:850px){.listing .product-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){.admin-product-form{padding:20px!important;margin:20px auto 45px!important}.listing .product-grid{gap:12px}}
