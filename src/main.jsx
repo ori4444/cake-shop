@@ -307,17 +307,16 @@ function Admin({ reload }) {
  const [error,setError]=useState(''),[orders,setOrders]=useState([]),[products,setProducts]=useState([]);
  const [screen,setScreen]=useState('home'),[busy,setBusy]=useState(false),[category,setCategory]=useState('yeast');
  const [form,setForm]=useState({name:'',categoryId:'yeast',price:'',image:''}),[file,setFile]=useState(null);
- const refresh=async()=>{const [o,p]=await Promise.all([getOrders(),getProducts()]);setOrders(o);setProducts(p);await reload()};
+ const refresh=async()=>{const p=await getProducts();setProducts(p);await reload();if(await isAdmin())setOrders(await getOrders())};
  useEffect(()=>{isAdmin().then(ok=>{if(ok){setUser(authUser());refresh().catch(e=>setError(e.message))}}).finally(()=>setChecking(false))},[]);
  const login=async e=>{e.preventDefault();setBusy(true);setError('');try{setUser(await signIn(email,password));await refresh()}catch(err){setError(err.message)}finally{setBusy(false)}};
  const change=async(id,status)=>{try{await changeOrder(id,status);await refresh()}catch(err){setError(err.message)}};
  const save=async e=>{e.preventDefault();setBusy(true);setError('');try{if(!file)throw Error('יש לבחור תמונה למוצר');const image=await uploadImage(file);await saveProduct({...form,description:'',image});setForm({name:'',categoryId:'yeast',price:'',image:''});setFile(null);await refresh();setScreen('home')}catch(err){setError(err.message)}finally{setBusy(false)}};
  const remove=async id=>{if(!window.confirm('למחוק את המוצר?'))return;try{await disableProduct(id);await refresh()}catch(err){setError(err.message)}};
- if(checking)return <section className="admin-page">בודקים הרשאות…</section>;
- if(!user)return <section className="admin-page admin-login-page"><div className="admin-login"><h1>ניהול</h1><p>יש להפעיל הרשאת מנהלת במערכת לפני השימוש.</p></div></section>;
  return <section className="admin-page">
  {screen!=='home'&&<button className="button outline" onClick={()=>{setScreen('home');setError('')}}>חזרה</button>}
  {error&&<p className="error-msg">{error}</p>}
+ {!user&&screen!=='home'&&<p>הפעולות המחוברות למסד דורשות חיבור מנהלת מאובטח.</p>}
  {screen==='home'&&<div className="admin-three-actions">
  <button onClick={()=>setScreen('orders')}>הזמנות</button>
  <button onClick={()=>setScreen('add')}>הוספת מוצר</button>
