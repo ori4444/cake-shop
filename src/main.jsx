@@ -193,6 +193,11 @@ function Custom({ addToCart }) {
         {error && <p className="error-msg">{error}</p>}
         <button className="button primary full" disabled={!description.trim() && !file} onClick={() => setSummary(true)}>המשך לסיכום <ArrowLeft size={16} /></button>
       </div></div>
+    <div className="custom-gallery" aria-label="תמונות השראה לעוגה בעיצוב אישי">
+      {initialProducts.filter(product => product.categoryId === 'mousse').map(product =>
+        <ShopImage key={product.id} src={product.image} fallback={categories[3].image}
+          alt={product.name} loading="lazy" />)}
+    </div>
     {summary && <SelectionSummary title={item.name} image={item.image}
       details="ממתינה להצעת מחיר" note={`${description}${note ? ` · ${note}` : ''}`}
       onClose={() => setSummary(false)} onAdd={() => { addToCart(item); setSummary(false); }} onOrder={orderNow} />}
