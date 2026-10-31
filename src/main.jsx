@@ -7,45 +7,16 @@ import {
   Clock, LoaderCircle, Pencil, Save, LogOut,
 } from 'lucide-react';
 import { categories, initialProducts, money } from './data';
-import { Account, Client, Databases, ID, Permission, Query, Role, Storage } from 'appwrite';
+import { configured, getProducts, authUser, signIn, signOut, isAdmin, getOrders, changeOrder, saveProduct, disableProduct, uploadImage, placeOrder } from './supabase';
 import './styles.css';
 
-const env = import.meta.env;
-const projectId = env.VITE_APPWRITE_PROJECT_ID || '6ae66bb4002feda402cd';
-const endpoint = env.VITE_APPWRITE_ENDPOINT || 'https://cloud.appwrite.io/v1';
-const databaseId = env.VITE_APPWRITE_DATABASE_ID;
-const productsCollection = env.VITE_APPWRITE_PRODUCTS_COLLECTION || 'products';
-const ordersCollection = env.VITE_APPWRITE_ORDERS_COLLECTION || 'orders';
-const bucketId = env.VITE_APPWRITE_BUCKET_ID || 'cake-images';
-const adminUserId = env.VITE_APPWRITE_ADMIN_USER_ID;
-const adminEmail = (env.VITE_ADMIN_EMAIL || '').trim().toLowerCase();
-const client = new Client().setEndpoint(endpoint).setProject(projectId);
-const account = new Account(client);
-const db = new Databases(client);
-const storage = new Storage(client);
-
 function useShop() {
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  const reload = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      if (!databaseId) throw new Error('VITE_APPWRITE_DATABASE_ID is not configured');
-      const result = await db.listDocuments(databaseId, productsCollection, [Query.limit(100)]);
-      setProducts(result.documents.filter(p => p.active !== false).map(p => ({ ...p, id: p.$id })));
-    } catch (err) {
-      console.error(err);
-      setError('לא הצלחנו לטעון את המוצרים מ־Appwrite. בדקו את המסד וההרשאות.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { reload(); }, []);
-  return { products, setProducts, loading, error, reload };
+ const [products,setProducts]=useState([]);
+ const [loading,setLoading]=useState(true);
+ const [error,setError]=useState('');
+ const reload=async()=>{setLoading(true);setError('');try{setProducts(await getProducts())}catch(e){setError(e.message)}finally{setLoading(false)}};
+ useEffect(()=>{reload()},[]);
+ return {products,setProducts,loading,error,reload};
 }
 
 function App() {
@@ -58,7 +29,7 @@ function App() {
 
   const addToCart = item => setCart(current => {
     const index = current.findIndex(x => x.productId && x.productId === item.productId && x.note === item.note && x.type === item.type);
-    if (index < 0) return [...current, { ...item, key: item.key || ID.unique() }];
+    if (index < 0) return [...current, { ...item, key: item.key || crypto.randomUUID() }];
     const next = [...current];
     next[index] = { ...next[index], quantity: next[index].quantity + item.quantity };
     return next;
@@ -301,27 +272,11 @@ function Checkout({ cart, setCart, changeQuantity, removeFromCart }) {
   const submit = async event => {
     event.preventDefault();
     setError('');
-    if (!databaseId) return setError('החיבור ל־Appwrite עדיין לא הוגדר.');
     if (!items.length) return setError('אין פריטים להזמנה.');
-    if (!name.trim() || phone.replace(/\D/g, '').length < 9) return setError('נא למלא שם מלא ומספר טלפון תקין.');
+    if (!name.trim() || phone.replace(/\\D/g, '').length < 9) return setError('נא למלא שם וטלפון תקין.');
     setBusy(true);
     try {
-      const orderItems = [];
-      for (const item of items) {
-        let imageId = item.imageId || '';
-        if (item.file instanceof File) {
-          const uploaded = await storage.createFile(bucketId, ID.unique(), item.file,
-            adminUserId ? [Permission.read(Role.user(adminUserId))] : []);
-          imageId = uploaded.$id;
-        }
-        orderItems.push(item.type === 'custom'
-          ? { custom: true, name: item.name, description: item.description, note: item.note || '', quantity: item.quantity, imageId }
-          : { custom: false, productId: item.productId, name: item.name, note: item.note || '', quantity: item.quantity });
-      }
-      const response = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customer_name: name.trim(), phone: phone.trim(), requested_date: date || '', items: orderItems }) });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.error || 'שמירת ההזמנה נכשלה.');
+      await placeOrder({name:name.trim(),phone:phone.trim(),date,items});
       if (!direct) setCart([]);
       sessionStorage.removeItem('cake-direct-checkout');
       setDone(true);
@@ -357,179 +312,46 @@ function Checkout({ cart, setCart, changeQuantity, removeFromCart }) {
   </section>;
 }
 
-function Admin({ products, setProducts, reload }) {
-  const [user, setUser] = useState(null);
-  const [checking, setChecking] = useState(true);
-  const [email, setEmail] = useState(adminEmail);
-  const [password, setPassword] = useState('');
-  const [loginError, setLoginError] = useState('');
-  const [tab, setTab] = useState('orders');
-  const [orders, setOrders] = useState([]);
-  const [permission, setPermission] = useState(typeof Notification === 'undefined' ? 'unsupported' : Notification.permission);
-  const [subscribed, setSubscribed] = useState(false);
-  const [form, setForm] = useState({ name: '', price: '', categoryId: 'yeast', description: '' });
-  const [file, setFile] = useState(null);
-  const [edit, setEdit] = useState(null);
-  const [msg, setMsg] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    account.get().then(current => {
-      if (!adminEmail || current.email.toLowerCase() !== adminEmail) throw new Error('This account is not the configured admin');
-      if (adminUserId && current.$id !== adminUserId) throw new Error('This account is not authorized');
-      setUser(current);
-    }).catch(() => setUser(null)).finally(() => setChecking(false));
-  }, []);
-
-  const loadOrders = async () => {
-    if (!databaseId) { setMsg('Appwrite עדיין לא הוגדר.'); return; }
-    try {
-      const result = await db.listDocuments(databaseId, ordersCollection, [Query.orderDesc('created_at'), Query.limit(100)]);
-      setOrders(result.documents.map(doc => ({ ...doc, id: doc.$id, items: JSON.parse(doc.items_json || '[]') })));
-    } catch (err) { console.error(err); setMsg('לא ניתן לטעון הזמנות מ־Appwrite. בדקו הרשאות.'); }
-  };
-
-  useEffect(() => { if (user) loadOrders(); }, [user]);
-
-  const login = async event => {
-    event.preventDefault(); setLoginError(''); setBusy(true);
-    try {
-      if (!databaseId || !adminEmail || !adminUserId) throw new Error('יש להגדיר ב־Vercel את VITE_APPWRITE_DATABASE_ID, VITE_APPWRITE_ADMIN_USER_ID ואת VITE_ADMIN_EMAIL.');
-      if (email.trim().toLowerCase() !== adminEmail) throw new Error('כתובת האימייל אינה מורשית לניהול.');
-      await account.createEmailPasswordSession(email.trim(), password);
-      const current = await account.get();
-      if (current.$id !== adminUserId || current.email.toLowerCase() !== adminEmail) {
-        await account.deleteSession('current'); throw new Error('המשתמש אינו מורשה לניהול.');
-      }
-      setUser(current);
-      const existing = await db.listDocuments(databaseId, productsCollection, [Query.limit(1)]);
-      if (existing.total === 0) {
-        for (const product of initialProducts) await db.createDocument(databaseId, productsCollection, product.id,
-          { name: product.name, categoryId: product.categoryId, description: product.description,
-            image: product.image, price: product.price, active: true },
-          [Permission.read(Role.any()), Permission.update(Role.user(current.$id)), Permission.delete(Role.user(current.$id))]);
-        await reload();
-      }
-    } catch (err) { console.error(err); setLoginError(err.message || 'ההתחברות נכשלה.'); }
-    finally { setBusy(false); }
-  };
-
-  const updateOrder = async (order, status) => {
-    try {
-      await db.updateDocument(databaseId, ordersCollection, order.id, { status });
-      setOrders(current => current.map(item => item.id === order.id ? { ...item, status } : item));
-    } catch (err) { console.error(err); setMsg('עדכון הסטטוס נכשל.'); }
-  };
-
-  const saveProduct = async event => {
-    event.preventDefault(); setMsg(''); setBusy(true);
-    try {
-      if (!databaseId || !user) throw new Error('נדרשת התחברות ל־Appwrite.');
-      let image = edit?.image || '';
-      if (file) {
-        const uploaded = await storage.createFile(bucketId, ID.unique(), file,
-          [Permission.read(Role.any()), Permission.update(Role.user(user.$id)), Permission.delete(Role.user(user.$id))]);
-        image = storage.getFileView(bucketId, uploaded.$id).toString();
-      }
-      const data = { name: form.name.trim(), price: Number(form.price), categoryId: form.categoryId,
-        description: form.description.trim(), image, active: true };
-      if (edit) {
-        await db.updateDocument(databaseId, productsCollection, edit.id, data);
-        setProducts(current => current.map(product => product.id === edit.id ? { ...product, ...data } : product));
-        setMsg('המוצר עודכן.');
-      } else {
-        const id = ID.unique();
-        const created = await db.createDocument(databaseId, productsCollection, id, data,
-          [Permission.read(Role.any()), Permission.update(Role.user(user.$id)), Permission.delete(Role.user(user.$id))]);
-        setProducts(current => [...current, { ...data, id: created.$id }]);
-        setMsg('המוצר נוסף.');
-      }
-      setForm({ name: '', price: '', categoryId: 'yeast', description: '' }); setFile(null); setEdit(null);
-    } catch (err) { console.error(err); setMsg(err.message || 'שמירת המוצר נכשלה.'); }
-    finally { setBusy(false); }
-  };
-
-  const removeProduct = async product => {
-    if (!confirm(`להסיר את ${product.name} מהקטלוג?`)) return;
-    try {
-      await db.updateDocument(databaseId, productsCollection, product.id, { active: false });
-      setProducts(current => current.filter(item => item.id !== product.id));
-      setMsg('המוצר הוסר מהקטלוג.');
-    } catch (err) { console.error(err); setMsg('מחיקת המוצר נכשלה.'); }
-  };
-
-  const subscribe = async () => {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) { setMsg('הדפדפן אינו תומך בהתראות Push.'); return; }
-    if (!env.VITE_VAPID_PUBLIC_KEY) { setMsg('חסר מפתח Push ב־Vercel.'); return; }
-    try {
-      const nextPermission = await Notification.requestPermission(); setPermission(nextPermission);
-      if (nextPermission !== 'granted') return;
-      const registration = await navigator.serviceWorker.ready;
-      const base64 = env.VITE_VAPID_PUBLIC_KEY.replace(/-/g, '+').replace(/_/g, '/');
-      const key = Uint8Array.from(atob(base64), char => char.charCodeAt(0));
-      const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
-      const jwt = await account.createJWT();
-      const response = await fetch('/api/push-subscriptions', { method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${jwt.jwt}` },
-        body: JSON.stringify(subscription) });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.error || 'רישום ההתראות נכשל.');
-      setSubscribed(true); setMsg('המכשיר נרשם לקבלת התראות.');
-    } catch (err) { console.error(err); setMsg(err.message || 'לא הצלחנו להפעיל התראות.'); }
-  };
-
-  if (checking) return <section className="admin-page"><p className="empty">בודקים הרשאת ניהול…</p></section>;
-  if (!user) return <section className="admin-page admin-login-page"><div className="admin-login">
-    <Link to="/" className="brand"><span className="brand-icon"><CakeSlice size={20} /></span>
-      <span><b>פירורים של אהבה</b><small>כניסה לניהול</small></span></Link>
-    <h1>כניסה למנהלת</h1><p>התחברו עם חשבון Appwrite שהוגדר לניהול.</p>
-    <form onSubmit={login}><label className="field-label" htmlFor="admin-email">אימייל</label>
-      <input id="admin-email" type="email" value={email} onChange={e => setEmail(e.target.value)} required />
-      <label className="field-label" htmlFor="admin-password">סיסמה</label>
-      <input id="admin-password" type="password" value={password} onChange={e => setPassword(e.target.value)} required />
-      {loginError && <div className="error-msg">{loginError}</div>}
-      <button className="button primary full" disabled={busy}>{busy ? 'מתחברים…' : 'התחברות'}</button>
-    </form></div></section>;
-
-  const latest = orders.filter(order => order.status === 'new').length;
-  const sales = orders.reduce((sum, order) => sum + (order.total || 0), 0);
-  const signOut = async () => { await account.deleteSession('current'); setUser(null); };
-
-  return <section className="admin-page"><div className="admin-top">
-    <Link className="brand" to="/"><span className="brand-icon"><CakeSlice size={20} /></span>
-      <span><b>פירורים של אהבה</b><small>מרכז ניהול</small></span></Link>
-    <button className="admin-signout" onClick={signOut}><LogOut size={15} /> יציאה</button>
-  </div><div className="admin-welcome"><div><div className="eyebrow">ניהול החנות</div>
-    <h1>הזמנות ומוצרים</h1></div><button className="icon-btn" onClick={subscribe} aria-label="הפעלת התראות"><Bell size={19} /></button></div>
-    <div className="admin-stats"><div><span>הזמנות חדשות</span><b>{latest}</b></div>
-      <div><span>כל ההזמנות</span><b>{orders.length}</b></div><div><span>סך הזמנות</span><b>{money(sales)}</b></div></div>
-    <div className="admin-tabs"><button className={tab === 'orders' ? 'active' : ''} onClick={() => setTab('orders')}><ClipboardList size={16} /> הזמנות <span>{latest}</span></button>
-      <button className={tab === 'products' ? 'active' : ''} onClick={() => setTab('products')}><Package size={16} /> מוצרים</button>
-      <button className={tab === 'settings' ? 'active' : ''} onClick={() => setTab('settings')}><Bell size={16} /> התראות</button></div>
-    {msg && <div className="admin-message" onClick={() => setMsg('')}>{msg}<X size={15} /></div>}
-    {tab === 'orders' ? <div className="admin-panel"><div className="panel-heading"><div><h2>הזמנות</h2><p>מהחדשה ביותר לישנה ביותר</p></div>
-      <button className="refresh-btn" onClick={loadOrders}>רענון <ArrowLeft size={14} /></button></div>
-      {orders.length ? orders.map(order => <AdminOrder key={order.id} order={order} update={updateOrder} />) :
-        <div className="admin-empty"><span><ShoppingBag /></span><h3>אין הזמנות עדיין</h3></div>}</div>
-      : tab === 'products' ? <div className="admin-panel"><div className="panel-heading"><div><h2>{edit ? 'עריכת מוצר' : 'הוספת מוצר'}</h2></div></div>
-        <form className="admin-product-form" onSubmit={saveProduct}>
-          <label>שם המוצר<input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></label>
-          <label>מחיר בשקלים<input required type="number" min="1" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} /></label>
-          <label>קטגוריה<select value={form.categoryId} onChange={e => setForm({ ...form, categoryId: e.target.value })}>{categories.filter(c => c.id !== 'custom').map(c => <option value={c.id} key={c.id}>{c.name}</option>)}</select></label>
-          <label>תיאור<textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows="2" /></label>
-          <label className="admin-file"><Upload size={16} />{file?.name || 'בחירת תמונה'}<input type="file" accept="image/*" required={!edit} onChange={e => setFile(e.target.files?.[0])} /></label>
-          <button className="button primary" disabled={busy}>{edit ? <><Save size={16} /> שמירה</> : <><Plus size={16} /> הוספה</>}</button>
-          {edit && <button type="button" className="button outline" onClick={() => { setEdit(null); setFile(null); setForm({ name: '', price: '', categoryId: 'yeast', description: '' }); }}>ביטול</button>}
-        </form><div className="admin-product-list"><h3>מוצרים <small>{products.length}</small></h3>
-          {products.map(product => <div className="admin-product" key={product.id}><img src={product.image} /><div><b>{product.name}</b><small>{money(product.price)}</small></div>
-            <button onClick={() => { setEdit(product); setFile(null); setForm({ name: product.name, price: product.price, categoryId: product.categoryId, description: product.description || '' }); }} aria-label="עריכת מוצר"><Pencil size={16} /></button>
-            <button onClick={() => removeProduct(product)} aria-label="מחיקת מוצר"><Trash2 size={16} /></button></div>)}</div></div>
-        : <div className="admin-panel settings-panel"><div className="panel-heading"><div><h2>התראות Push</h2><p>{subscribed ? 'המכשיר רשום להתראות.' : 'קבלת התראה על כל הזמנה חדשה.'}</p></div></div>
-          <button className="button outline" onClick={subscribe}>{permission === 'granted' ? 'רישום המכשיר להתראות' : 'הפעלת התראות'}</button>
-          <div className="setting-row"><div className="setting-icon"><Package /></div><div><b>התקנה בטלפון</b><p>פתחו את תפריט הדפדפן ובחרו ״הוספה למסך הבית״.</p></div></div>
-        </div>}
-    <div className="admin-bottom"><span>פירורים של אהבה</span><Link to="/">חזרה לחנות</Link></div>
-  </section>;
+function Admin({ reload }) {
+ const [user,setUser]=useState(null);
+ const [checking,setChecking]=useState(true);
+ const [email,setEmail]=useState('');
+ const [password,setPassword]=useState('');
+ const [error,setError]=useState('');
+ const [orders,setOrders]=useState([]);
+ const [products,setProducts]=useState([]);
+ const [tab,setTab]=useState('orders');
+ const [busy,setBusy]=useState(false);
+ const [form,setForm]=useState({name:'',categoryId:'yeast',price:'',description:'',image:''});
+ const [file,setFile]=useState(null);
+ const [editing,setEditing]=useState(null);
+ const refresh=async()=>{const [o,p]=await Promise.all([getOrders(),getProducts()]);setOrders(o);setProducts(p);await reload()};
+ useEffect(()=>{isAdmin().then(ok=>{if(ok){setUser(authUser());refresh().catch(e=>setError(e.message))}}).finally(()=>setChecking(false))},[]);
+ const login=async e=>{e.preventDefault();setBusy(true);setError('');try{setUser(await signIn(email,password));await refresh()}catch(err){setError(err.message)}finally{setBusy(false)}};
+ const change=async(id,status)=>{try{await changeOrder(id,status);await refresh()}catch(err){setError(err.message)}};
+ const save=async e=>{e.preventDefault();setBusy(true);setError('');try{let image=form.image;if(file)image=await uploadImage(file);await saveProduct({...form,image},editing);setForm({name:'',categoryId:'yeast',price:'',description:'',image:''});setEditing(null);setFile(null);await refresh()}catch(err){setError(err.message)}finally{setBusy(false)}};
+ const remove=async id=>{if(!window.confirm('להסיר את המוצר?'))return;try{await disableProduct(id);await refresh()}catch(err){setError(err.message)}};
+ if(checking)return <section className="admin-page">בודקים הרשאות…</section>;
+ if(!user)return <section className="admin-page admin-login-page"><div className="admin-login"><h1>כניסה לניהול</h1><form onSubmit={login}>
+ <label className="field-label">אימייל</label><input type="email" required value={email} onChange={e=>setEmail(e.target.value)}/>
+ <label className="field-label">סיסמה</label><input type="password" required value={password} onChange={e=>setPassword(e.target.value)}/>
+ {error&&<p className="error-msg">{error}</p>}<button className="button primary full" disabled={busy}>התחברות</button></form></div></section>;
+ return <section className="admin-page"><div className="admin-top"><h2>ניהול הקונדיטוריה</h2><button className="button outline" onClick={()=>{signOut();setUser(null)}}>יציאה</button></div>
+ <div className="admin-tabs"><button onClick={()=>setTab('orders')}>הזמנות ({orders.length})</button><button onClick={()=>setTab('products')}>מוצרים ({products.length})</button></div>
+ {error&&<p className="error-msg">{error}</p>}
+ {tab==='orders'?<div>{orders.length===0?<p>אין הזמנות עדיין</p>:orders.map(o=><div key={o.id} className="admin-order">
+ <h3>{o.customer_name} — {o.phone}</h3><small>{new Date(o.created_at).toLocaleString('he-IL')} · {o.requested_date||'ללא תאריך מבוקש'}</small>
+ <div>{(o.items||[]).map((item,i)=><p key={i}>{item.name} × {item.quantity} {item.note&&' — '+item.note} {item.description&&' — '+item.description}</p>)}</div>
+ <b>{money(o.total)}</b><select value={o.status} onChange={e=>change(o.id,e.target.value)}><option value="new">חדשה</option><option value="confirmed">אושרה</option><option value="preparing">בהכנה</option><option value="completed">הושלמה</option><option value="cancelled">בוטלה</option></select></div>)}</div>:
+ <div><form className="admin-product-form" onSubmit={save}><h3>{editing?'עריכת מוצר':'הוספת מוצר'}</h3>
+ <label className="field-label">שם מוצר</label><input required value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/>
+ <label className="field-label">קטגוריה</label><select value={form.categoryId} onChange={e=>setForm({...form,categoryId:e.target.value})}>{categories.filter(c=>c.id!=='custom').map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
+ <label className="field-label">מחיר</label><input type="number" min="0" required value={form.price} onChange={e=>setForm({...form,price:e.target.value})}/>
+ <label className="field-label">תיאור</label><textarea value={form.description} onChange={e=>setForm({...form,description:e.target.value})}/>
+ <label className="field-label">תמונה</label><input type="file" accept="image/jpeg,image/png,image/webp" onChange={e=>setFile(e.target.files?.[0]||null)}/>
+ <button className="button primary" disabled={busy}>שמירה</button></form>
+ <div className="admin-products">{products.map(p=><div className="cart-row" key={p.id}><img src={p.image}/><div className="cart-item-copy"><b>{p.name}</b><small>{money(p.price)}</small></div><button onClick={()=>{setEditing(p.id);setForm({name:p.name,categoryId:p.categoryId,price:String(p.price),description:p.description,image:p.image});window.scrollTo(0,0)}}>עריכה</button><button onClick={()=>remove(p.id)}>הסרה</button></div>)}</div></div>}
+ </section>;
 }
 
 function AdminOrder({ order, update }) {
