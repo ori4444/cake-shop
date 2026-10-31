@@ -91,7 +91,7 @@ function Header() {
       <span><b>פירורים של אהבה</b><small>קונדיטוריה ביתית</small></span></Link>
     <nav className={menu ? 'nav open' : 'nav'}>
       <a href="/#shop" onClick={() => setMenu(false)}>הקטגוריות</a>
-      <a href="/#contact" onClick={() => setMenu(false)}>צרו קשר</a>
+      
     </nav>
     <button className="mobile-menu" onClick={() => setMenu(!menu)} aria-label="תפריט">
       {menu ? <X /> : <Menu />}
@@ -111,33 +111,17 @@ function RoutesView(props) {
 }
 
 function Home({ error }) {
-  return <>
-    <section className="hero home-hero"><div className="hero-content">
-      <div className="eyebrow"><span /> נאפה באהבה</div>
-      <h1>מה מתחשק לכם<br /><em>היום?</em></h1>
-      <p>בחרו קטגוריה, מצאו את המתוק שלכם, ואנחנו נכין אותו באהבה.</p>
-      <a className="button primary" href="#shop">לכל הקטגוריות <ArrowLeft size={17} /></a>
-    </div><div className="hero-photo">
-      <img src="https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=1100&q=90" />
-      <div className="photo-badge"><Heart size={16} fill="currentColor" /> נאפה במיוחד בשבילך</div>
-    </div></section>
+  return <section className="section categories-section home-categories" id="shop">
+    <div className="section-heading"><h1>בחרו קטגוריה</h1></div>
     {error && <div className="shop-error">{error}</div>}
-    <section className="section categories-section" id="shop">
-      <div className="section-heading"><div><div className="eyebrow">הקולקציה שלנו</div>
-        <h2>מה בא לכם להזמין?</h2></div></div>
-      <div className="category-grid">{categories.map((category, i) => <Link
-        to={category.id === 'custom' ? '/custom' : `/category/${category.id}`}
-        className={`category-card cat-${i}`} key={category.id}>
-        <img src={category.image} loading="lazy" /><div className="category-shade" />
-        <div className="category-top"><span>0{i + 1}</span><ArrowLeft size={17} /></div>
-        <div className="category-copy"><small>{category.short}</small><h3>{category.name}</h3>
-          <span className="category-open">{category.id === 'custom' ? 'לעיצוב אישי' : 'לגלריה'} <ArrowLeft size={14} /></span>
-        </div></Link>)}</div>
-    </section>
-    <section className="contact-section compact-contact" id="contact"><div>
-      <div className="eyebrow">צרו קשר</div><h2>צריכים עזרה בהזמנה?</h2>
-    </div><a className="button primary" href="https://wa.me/972500000000" target="_blank" rel="noreferrer">דברו איתנו בוואטסאפ</a></section>
-  </>;
+    <div className="category-grid">{categories.map(category => <Link
+      to={category.id === 'custom' ? '/custom' : `/category/${category.id}`}
+      className="category-card" key={category.id}>
+      <img src={category.image} alt={category.name} loading="lazy" />
+      <div className="category-shade" />
+      <div className="category-copy"><h2>{category.name}</h2></div>
+    </Link>)}</div>
+  </section>;
 }
 
 function ProductCard({ product, index = 0 }) {
