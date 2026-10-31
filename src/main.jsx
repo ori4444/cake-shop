@@ -11,7 +11,7 @@ import { configured, getProducts, authUser, signIn, signOut, isAdmin, getOrders,
 import './styles.css';
 
 function useShop() {
- const [products,setProducts]=useState([]);
+ const [products,setProducts]=useState(initialProducts);
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState('');
  const reload=async()=>{setLoading(true);setError('');try{setProducts(await getProducts())}catch(e){setError(e.message)}finally{setLoading(false)}};
@@ -77,16 +77,29 @@ function Home({ error }) {
     <div className="category-grid">{categories.map(category => <Link
       to={category.id === 'custom' ? '/custom' : `/category/${category.id}`}
       className="category-card" key={category.id}>
-      <img src={category.image} alt={category.name} loading="lazy" />
+      <ShopImage src={category.image} alt={category.name} loading="lazy" />
       <div className="category-shade" />
       <div className="category-copy"><h2>{category.name}</h2></div>
     </Link>)}</div>
   </section>;
 }
 
+const FALLBACK_IMAGE = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 160"><rect width="200" height="160" fill="#f4ece3"/><path d="M54 91h92v42H54z" fill="#c58a67"/><path d="M54 91h92l-28-35H82z" fill="#fff8ef"/><path d="M88 72c0-8 6-14 12-14s12 6 12 14" fill="none" stroke="#b67360" stroke-width="5" stroke-linecap="round"/></svg>')}`;
+
+function ShopImage({ src, fallback, alt = '', ...props }) {
+  const sources = [...new Set([src, fallback, FALLBACK_IMAGE].filter(Boolean))];
+  const [sourceIndex, setSourceIndex] = useState(0);
+  useEffect(() => setSourceIndex(0), [src, fallback]);
+  return <img {...props} src={sources[sourceIndex] || FALLBACK_IMAGE} alt={alt}
+    onError={event => {
+      if (sourceIndex < sources.length - 1) setSourceIndex(sourceIndex + 1);
+      else event.currentTarget.onerror = null;
+    }} />;
+}
+
 function ProductCard({ product, index = 0 }) {
   return <Link to={`/product/${product.id}`} className="product-card">
-    <div className="product-img"><img src={product.image} loading="lazy" onError={e => { e.currentTarget.onerror = null; e.currentTarget.src = categories.find(c => c.id === product.categoryId)?.image || ""; }} />
+    <div className="product-img"><ShopImage src={product.image} fallback={categories.find(c => c.id === product.categoryId)?.image} alt={product.name} loading="lazy" />
       <span className="product-tag">נאפה טרי</span><span className="product-arrow"><ArrowLeft size={17} /></span></div>
     <div className="product-info"><div><h3>{product.name}</h3><p>{product.description}</p></div>
       <b>{money(product.price)}</b></div>
@@ -99,10 +112,11 @@ function Category({ products, loading, error }) {
   const items = products.filter(product => product.categoryId === id && product.active !== false);
   if (!category) return <NotFound />;
   return <section className="section listing">
-    <div className="breadcrumbs"><Link to="/">בית</Link><span>/</span><b>{category.name}</b></div>
+    <div className="breadcrumbs"><Link to="/">← חזרה לכל הקטגוריות</Link><span>/</span><b>{category.name}</b></div>
     <div className="listing-head"><h1>{category.name}</h1></div>
-    {error ? <p className="error-msg">{error}</p> : loading ? <p className="empty">טוענים מוצרים…</p> :
-      items.length ? <div className="product-grid">{items.map((product, i) => <ProductCard key={product.id} product={product} index={i} />)}</div> :
+    {items.length ? <div className="product-grid">{items.map((product, i) => <ProductCard key={product.id} product={product} index={i} />)}</div> :
+      loading ? <p className="empty">טוענים מוצרים…</p> :
+      error ? <p className="error-msg">{error}</p> :
         <p className="empty">עדיין אין מוצרים בקטגוריה הזאת.</p>}
   </section>;
 }
@@ -122,10 +136,10 @@ function Product({ products, addToCart }) {
     navigate('/checkout', { state: { direct: true, items: [item] } });
   };
   return <section className="section detail">
-    <div className="breadcrumbs"><Link to="/">בית</Link><span>/</span>
-      <Link to={`/category/${product.categoryId}`}>{categories.find(c => c.id === product.categoryId)?.name}</Link>
+    <div className="breadcrumbs"><Link to="/">חזרה לכל הקטגוריות</Link><span>/</span>
+      <Link to={`/category/${product.categoryId}`}>← חזרה לקטגוריה</Link>
       <span>/</span><b>{product.name}</b></div>
-    <div className="detail-grid"><div className="detail-photo"><img src={product.image} onError={e => { e.currentTarget.onerror = null; e.currentTarget.src = categories.find(c => c.id === product.categoryId)?.image || ""; }} /><span className="product-tag">נאפה טרי</span></div>
+    <div className="detail-grid"><div className="detail-photo"><ShopImage src={product.image} fallback={categories.find(c => c.id === product.categoryId)?.image} alt={product.name} /><span className="product-tag">נאפה טרי</span></div>
       <div className="detail-copy"><div className="eyebrow">הבחירה שלכם</div><h1>{product.name}</h1>
         <p>{product.description}</p><div className="detail-price">{money(product.price)} <small>ליחידה</small></div>
         <label className="field-label">כמות</label><div className="quantity">
@@ -163,7 +177,7 @@ function Custom({ addToCart }) {
     navigate('/checkout', { state: { direct: true, items: [item] } }); };
   return <section className="section detail">
     <div className="breadcrumbs"><Link to="/">בית</Link><span>/</span><b>עוגה בעיצוב אישי</b></div>
-    <div className="custom-layout"><div className="custom-banner"><img src={categories[5].image} />
+    <div className="custom-layout"><div className="custom-banner"><ShopImage src={categories[5].image} alt="עוגה בעיצוב אישי" />
       <div><span>החלום שלכם, בעיצוב שלנו</span><h1>עוגה אישית<br />בעיצוב שלכם</h1></div></div>
       <div className="custom-form"><div className="eyebrow">עוגה בעיצוב אישי</div><h2>מה תרצו שנכין?</h2>
         <p>תארו את העוגה, צרפו תמונה להשראה או מלאו את שניהם.</p>
@@ -188,7 +202,7 @@ function Custom({ addToCart }) {
 function SelectionSummary({ title, image, details, note, onClose, onAdd, onOrder }) {
   return <div className="modal-backdrop" onClick={onClose}><div className="modal" onClick={e => e.stopPropagation()}>
     <button className="modal-close" onClick={onClose} aria-label="סגירה"><X /></button>
-    <img className="selection-image" src={image} />
+    <ShopImage className="selection-image" src={image} fallback={categories[5].image} alt={title} />
     <div className="eyebrow">סיכום בחירה</div><h2>{title}</h2><p>{details}</p>
     {note && <div className="modal-note">{note}</div>}
     <button className="button primary full" onClick={onAdd}>הוסף למארז <ShoppingBag size={16} /></button>
@@ -212,7 +226,7 @@ function CartDrawer({ open, close, cart, removeFromCart, changeQuantity }) {
 }
 
 function CartRow({ item, remove, change }) {
-  return <div className="cart-row"><img src={item.image} /><div className="cart-item-copy"><b>{item.name}</b>
+  return <div className="cart-row"><ShopImage src={item.image} alt={item.name} /><div className="cart-item-copy"><b>{item.name}</b>
     <small>{item.price ? money(item.price) : 'ממתינה להצעת מחיר'}</small>
     {item.note && <small className="muted">{item.note}</small>}{item.description && <small className="muted">{item.description}</small>}
     <div className="quantity small"><button onClick={() => change(-1)} aria-label="הפחתת כמות"><Minus size={12} /></button>
