@@ -314,7 +314,7 @@ function Admin({ reload }) {
  const save=async e=>{e.preventDefault();setBusy(true);setError('');try{if(!file)throw Error('יש לבחור תמונה למוצר');const image=await uploadImage(file);await saveProduct({...form,description:'',image});setForm({name:'',categoryId:'yeast',price:'',image:''});setFile(null);await refresh();setScreen('home')}catch(err){setError(err.message)}finally{setBusy(false)}};
  const remove=async id=>{if(!window.confirm('למחוק את המוצר?'))return;try{await disableProduct(id);await refresh()}catch(err){setError(err.message)}};
  if(checking)return <section className="admin-page">בודקים הרשאות…</section>;
- if(!user)return <section className="admin-page admin-login-page"><div className="admin-login"><h1>כניסה לניהול</h1><form onSubmit={login}><label className="field-label">אימייל</label><input type="email" required value={email} onChange={e=>setEmail(e.target.value)}/><label className="field-label">סיסמה</label><input type="password" required value={password} onChange={e=>setPassword(e.target.value)}/>{error&&<p className="error-msg">{error}</p>}<button className="button primary full" disabled={busy}>התחברות</button></form></div></section>;
+ if(!user)return <section className="admin-page admin-login-page"><div className="admin-login"><h1>ניהול</h1><p>יש להפעיל הרשאת מנהלת במערכת לפני השימוש.</p></div></section>;
  return <section className="admin-page">
  {screen!=='home'&&<button className="button outline" onClick={()=>{setScreen('home');setError('')}}>חזרה</button>}
  {error&&<p className="error-msg">{error}</p>}
