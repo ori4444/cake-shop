@@ -100,9 +100,7 @@ function Category({ products, loading, error }) {
   if (!category) return <NotFound />;
   return <section className="section listing">
     <div className="breadcrumbs"><Link to="/">בית</Link><span>/</span><b>{category.name}</b></div>
-    <div className="listing-head"><div><div className="eyebrow">הקטגוריה שלנו</div>
-      <h1>{category.name}</h1><p>{category.short}</p></div>
-      <span className="count-note">{items.length} מוצרים</span></div>
+    <div className="listing-head"><h1>{category.name}</h1></div>
     {error ? <p className="error-msg">{error}</p> : loading ? <p className="empty">טוענים מוצרים…</p> :
       items.length ? <div className="product-grid">{items.map((product, i) => <ProductCard key={product.id} product={product} index={i} />)}</div> :
         <p className="empty">עדיין אין מוצרים בקטגוריה הזאת.</p>}
@@ -327,7 +325,7 @@ function Admin({ reload }) {
  <label className="field-label">שם מוצר</label><input required value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/>
  <label className="field-label">קטגוריה</label><select value={form.categoryId} onChange={e=>setForm({...form,categoryId:e.target.value})}>{categories.filter(c=>c.id!=='custom').map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
  <label className="field-label">מחיר</label><input type="number" min="0" required value={form.price} onChange={e=>setForm({...form,price:e.target.value})}/>
- <label className="field-label">תמונה</label><input type="file" accept="image/jpeg,image/png,image/webp" required onChange={e=>setFile(e.target.files?.[0]||null)}/>
+ <input aria-label="בחירת קובץ" type="file" accept="image/jpeg,image/png,image/webp" required onChange={e=>setFile(e.target.files?.[0]||null)}/>
  <button className="button primary" disabled={busy}>שמירה</button></form>}
  {screen==='delete'&&<div><h2>מחיקת מוצר</h2><label className="field-label">קטגוריה</label><select value={category} onChange={e=>setCategory(e.target.value)}>{categories.filter(c=>c.id!=='custom').map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><div className="admin-products">{products.filter(p=>p.categoryId===category).map(p=><div className="cart-row" key={p.id}><img src={p.image} alt=""/><div className="cart-item-copy"><b>{p.name}</b><small>{money(p.price)}</small></div><button className="button outline" onClick={()=>remove(p.id)}>מחיקה</button></div>)}</div></div>}
  </section>;
