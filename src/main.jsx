@@ -41,12 +41,12 @@ function App() {
   const count = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   return <>
-    <Header />
+    {!window.location.pathname.startsWith("/admin") && <Header />}
     <main className="main">
       <RoutesView {...shop} cart={cart} setCart={setCart} addToCart={addToCart}
         removeFromCart={removeFromCart} changeQuantity={changeQuantity} />
     </main>
-    <Footer />
+    {!window.location.pathname.startsWith("/admin") && <Footer />}
     {count > 0 && <button className="cart-float" onClick={() => setDrawer(true)} aria-label="פתיחת המארז">
       <ShoppingBag size={20} /><span>המארז שלי</span><b>{count}</b>
     </button>}
@@ -56,17 +56,8 @@ function App() {
 }
 
 function Header() {
-  const [menu, setMenu] = useState(false);
   return <header className="header"><div className="header-inner">
-    <Link to="/" className="brand"><span className="brand-icon"><CakeSlice size={21} /></span>
-      <span><b>פירורים של אהבה</b><small>קונדיטוריה ביתית</small></span></Link>
-    <nav className={menu ? 'nav open' : 'nav'}>
-      <a href="/#shop" onClick={() => setMenu(false)}>הקטגוריות</a>
-      
-    </nav>
-    <button className="mobile-menu" onClick={() => setMenu(!menu)} aria-label="תפריט">
-      {menu ? <X /> : <Menu />}
-    </button>
+    <Link to="/" className="brand"><span><b>פירורים של אהבה</b></span></Link>
   </div></header>;
 }
 
@@ -83,7 +74,6 @@ function RoutesView(props) {
 
 function Home({ error }) {
   return <section className="section categories-section home-categories" id="shop">
-    <div className="section-heading"><h1>בחרו קטגוריה</h1></div>
     {error && <div className="shop-error">{error}</div>}
     <div className="category-grid">{categories.map(category => <Link
       to={category.id === 'custom' ? '/custom' : `/category/${category.id}`}
@@ -377,12 +367,7 @@ function AdminOrder({ order, update }) {
     </div>}</article>;
 }
 
-function Footer() {
-  return <footer className="footer"><div className="footer-inner"><Link to="/" className="brand">
-    <span className="brand-icon"><CakeSlice size={19} /></span><span><b>פירורים של אהבה</b><small>קונדיטוריה ביתית</small></span></Link>
-    <span className="footer-copy">נאפה באהבה</span><div className="footer-links"><Link to="/admin">ניהול</Link></div>
-  </div></footer>;
-}
+function Footer() { return null; }
 
 function NotFound() {
   return <section className="section done-page"><span className="modal-icon"><CakeSlice /></span><h1>העמוד לא נמצא</h1><Link to="/" className="button primary">חזרה לבית <ArrowRight /></Link></section>;
