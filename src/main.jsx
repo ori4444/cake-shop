@@ -86,7 +86,7 @@ function Home({ error }) {
 
 function ProductCard({ product, index = 0 }) {
   return <Link to={`/product/${product.id}`} className="product-card">
-    <div className="product-img"><img src={product.image} loading="lazy" />
+    <div className="product-img"><img src={product.image} loading="lazy" onError={e => { e.currentTarget.onerror = null; e.currentTarget.src = categories.find(c => c.id === product.categoryId)?.image || ""; }} />
       <span className="product-tag">נאפה טרי</span><span className="product-arrow"><ArrowLeft size={17} /></span></div>
     <div className="product-info"><div><h3>{product.name}</h3><p>{product.description}</p></div>
       <b>{money(product.price)}</b></div>
@@ -127,7 +127,7 @@ function Product({ products, addToCart }) {
     <div className="breadcrumbs"><Link to="/">בית</Link><span>/</span>
       <Link to={`/category/${product.categoryId}`}>{categories.find(c => c.id === product.categoryId)?.name}</Link>
       <span>/</span><b>{product.name}</b></div>
-    <div className="detail-grid"><div className="detail-photo"><img src={product.image} /><span className="product-tag">נאפה טרי</span></div>
+    <div className="detail-grid"><div className="detail-photo"><img src={product.image} onError={e => { e.currentTarget.onerror = null; e.currentTarget.src = categories.find(c => c.id === product.categoryId)?.image || ""; }} /><span className="product-tag">נאפה טרי</span></div>
       <div className="detail-copy"><div className="eyebrow">הבחירה שלכם</div><h1>{product.name}</h1>
         <p>{product.description}</p><div className="detail-price">{money(product.price)} <small>ליחידה</small></div>
         <label className="field-label">כמות</label><div className="quantity">
