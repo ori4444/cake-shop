@@ -50,3 +50,9 @@
 .category-photo-grid a:hover img{transform:scale(1.035)}
 .custom-gallery img{object-fit:cover}
 @media(max-width:600px){.customer-back-nav{padding:12px 19px 0}.category-photo-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.category-photo-grid img{height:145px}.category-gallery-section{margin-top:32px}}
+
+/* Short confirmation after successful admin actions */
+.admin-toast{position:fixed;z-index:1000;top:calc(env(safe-area-inset-top,0px) + 20px);left:50%;transform:translateX(-50%);display:flex;align-items:center;justify-content:center;gap:10px;max-width:min(92vw,420px);min-width:220px;padding:15px 22px;border-radius:14px;background:#285b43;color:#fff;box-shadow:0 8px 30px #0003;font-size:15px;font-weight:600;text-align:center;pointer-events:none;animation:admin-toast-in .18s ease-out}
+.admin-toast svg{flex-shrink:0}
+@keyframes admin-toast-in{from{opacity:0;transform:translate(-50%,-12px)}to{opacity:1;transform:translate(-50%,0)}}
+@media(prefers-reduced-motion:reduce){.admin-toast{animation:none}}
