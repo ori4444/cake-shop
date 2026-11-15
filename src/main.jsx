@@ -7,7 +7,7 @@ import {
   Clock, LoaderCircle, Pencil, Save, LogOut,
 } from 'lucide-react';
 import { categories, customCakeImages, initialProducts, money } from './data';
-import { configured, getProducts, authUser, signIn, signUp, signOut, isAdmin, getOrders, changeOrder, saveProduct, disableProduct, uploadImage, placeOrder, enableAdminNotifications, getPrivateImageUrl } from './supabase';
+import { configured, getProducts, authUser, signIn, signUp, signOut, isAdmin, getOrders, changeOrder, saveProduct, disableProduct, uploadImage, placeOrder } from './supabase';
 import './styles.css';
 
 // Each Vercel project builds a distinct public customer site or installable admin app.
@@ -312,14 +312,14 @@ function Checkout({ cart, setCart }) {
     if (busy) return;
     setError('');
     if (!items.length) return setError('אין פריטים להזמנה.');
-    if (!name.trim() || phone.replace(/\\D/g, '').length < 9) return setError('נא למלא שם וטלפון תקין.');
+    if (!name.trim() || phone.replace(/\D/g, '').length < 9) return setError('נא למלא שם וטלפון תקין.');
     setBusy(true);
     try {
       // Files are uploaded before creating the order; errors must not produce a false confirmation.
       const prepared = await Promise.all(items.map(async item => {
         if (item.type !== 'custom' || !item.file) return item;
-        const imageId = await uploadImage(item.file, true);
-        return { ...item, imageId };
+        const uploadedImage = await uploadImage(item.file);
+        return { ...item, uploadedImage };
       }));
       await placeOrder({ name: name.trim(), phone: phone.trim(), date, items: prepared });
       if (!direct) setCart([]);
@@ -363,86 +363,61 @@ function Checkout({ cart, setCart }) {
 }
 
 function Admin({ reload }) {
- const [authorized,setAuthorized]=useState(null);
- const [email,setEmail]=useState('');
- const [password,setPassword]=useState('');
+ const installed = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
  const [error,setError]=useState(''),[orders,setOrders]=useState([]),[products,setProducts]=useState([]);
+ const [toast,setToast]=useState(null);
+ const notify=message=>setToast({id:Date.now(),message});
+ useEffect(()=>{
+   if (!toast) return;
+   const timer=setTimeout(()=>setToast(null),2800);
+   return ()=>clearTimeout(timer);
+ },[toast]);
  const [screen,setScreen]=useState('home'),[busy,setBusy]=useState(false),[category,setCategory]=useState('yeast');
  const [form,setForm]=useState({name:'',categoryId:'yeast',price:'',image:''}),[file,setFile]=useState(null);
- const [pushStatus,setPushStatus]=useState('');
+ const [alerts,setAlerts]=useState(false);
+ const lastOrderRef = React.useRef(null);
  const refresh=async()=>{
    const [p,o]=await Promise.all([getProducts(),getOrders()]);
+   if(lastOrderRef.current && o.length && o[0].id !== lastOrderRef.current && alerts && 'Notification' in window && Notification.permission === 'granted') {
+     new Notification('התקבלה הזמנה חדשה', {body: `${o[0].customer_name} שלח/ה הזמנה`, icon:'/icon-192.png'});
+   }
+   if(o.length) lastOrderRef.current = o[0].id;
    setProducts(p);setOrders(o);await reload();
  };
+ useEffect(()=>{refresh().catch(e=>setError(e.message))},[]);
  useEffect(()=>{
-   isAdmin().then(ok=>{setAuthorized(ok);if(ok)refresh().catch(e=>setError(e.message))})
-     .catch(()=>setAuthorized(false));
- },[]);
- const login=async e=>{
-   e.preventDefault();setBusy(true);setError('');
-   try { await signIn(email,password);setAuthorized(true);await refresh(); }
-   catch(err){setError(err.message);setAuthorized(false)}
-   finally {setBusy(false); }
- };
- const change=async(id,status)=>{try{await changeOrder(id,status);await refresh()}catch(err){setError(err.message)}};
- const save=async e=>{e.preventDefault();setBusy(true);setError('');try{if(!file)throw Error('יש לבחור תמונה למוצר');const image=await uploadImage(file);await saveProduct({...form,description:'',image});setForm({name:'',categoryId:'yeast',price:'',image:''});setFile(null);await refresh();setScreen('home')}catch(err){setError(err.message)}finally{setBusy(false)}};
- const remove=async id=>{if(!window.confirm('למחוק את המוצר?'))return;try{await disableProduct(id);await refresh()}catch(err){setError(err.message)}};
- if(authorized===null)return <section className="section"><p>טוענים ניהול…</p></section>;
- if(!authorized)return <section className="section admin-login-page"><form className="admin-login" onSubmit={login}>
-   <h1>כניסה לניהול</h1>
-   <label className="field-label" htmlFor="admin-email">אימייל</label>
-   <input id="admin-email" type="email" required value={email} onChange={e=>setEmail(e.target.value)} />
-   <label className="field-label" htmlFor="admin-pass">סיסמה</label>
-   <input id="admin-pass" type="password" required value={password} onChange={e=>setPassword(e.target.value)} />
-   {error&&<p className="error-msg">{error}</p>}
-   <button className="button primary" disabled={busy}>כניסה</button>
- </form></section>;
+   if(!alerts || screen!=='orders')return;
+   const interval=setInterval(()=>refresh().catch(e=>setError(e.message)),20000);
+   return ()=>clearInterval(interval);
+ },[alerts,screen]);
+ const change=async(id,status)=>{try{setError('');await changeOrder(id,status);await refresh();notify('סטטוס ההזמנה עודכן בהצלחה')}catch(err){setError(err.message)}};
+ const save=async e=>{e.preventDefault();setBusy(true);setError('');try{if(!file)throw Error('יש לבחור תמונה למוצר');const image=await uploadImage(file);notify('התמונה עלתה בהצלחה');await saveProduct({...form,description:'',image});setForm({name:'',categoryId:'yeast',price:'',image:''});setFile(null);await refresh();setScreen('home');notify('המוצר נוסף בהצלחה')}catch(err){setError(err.message)}finally{setBusy(false)}};
+ const remove=async id=>{if(!window.confirm('למחוק את המוצר?'))return;try{setError('');await disableProduct(id);await refresh();notify('המוצר נמחק בהצלחה')}catch(err){setError(err.message)}};
  return <section className="admin-page">
+ <AdminNotificationPrompt />
+ {toast&&<div className="admin-toast" key={toast.id} role="status" aria-live="polite"><Check size={19} aria-hidden="true"/>{toast.message}</div>}
+ {screen==='home'&&!installed&&<p className="admin-install-tip">להתקנה בטלפון: באנדרואיד פתחי את תפריט Chrome ובחרי ״התקנת אפליקציה״; באייפון פתחי ב־Safari, לחצי על שיתוף ואז ״הוסף למסך הבית״.</p>}
  {screen!=='home'&&<button className="button outline" onClick={()=>{setScreen('home');setError('')}}>חזרה</button>}
  {error&&<p className="error-msg">{error}</p>}
- {screen==='home'&&<><div className="admin-three-actions">
-   <button onClick={()=>{setScreen('orders');refresh().catch(e=>setError(e.message))}}>הזמנות</button>
-   <button onClick={()=>setScreen('add')}>הוספת מוצר</button>
-   <button onClick={()=>setScreen('delete')}>מחיקת מוצר</button>
- </div><div className="admin-notifications">
-   <button className="button outline" onClick={async()=>{
-     setPushStatus('מפעילים התראות…');
-     try {await enableAdminNotifications();setPushStatus('התראות הופעלו במכשיר הזה.')}
-     catch(e){setPushStatus(e.message)}
-   }}><Bell size={16}/> הפעלת התראות בטלפון</button>
-   {pushStatus&&<p>{pushStatus}</p>}
-   <button className="button outline" onClick={async()=>{await signOut();setAuthorized(false)}}>התנתקות</button>
- </div></>}
- {screen==='orders'&&<div><h2>הזמנות</h2>{orders.length===0?<p>אין הזמנות עדיין</p>:orders.map(o=>
-   <article key={o.id} className="admin-order">
-     <h3>{o.customer_name} — <a href={`tel:${o.phone}`}>{o.phone}</a></h3>
-     <small>{new Date(o.created_at).toLocaleString('he-IL')} · {o.requested_date ? `למועד ${new Date(o.requested_date).toLocaleString('he-IL')}` : 'ללא מועד כללי'}</small>
-     <div>{(o.items||[]).map((item,i)=><div className="admin-order-item" key={i}>
-       <p><b>{item.name} × {item.quantity}</b>{item.note&&' — '+item.note}{item.description&&' — '+item.description}</p>
-       {item.requestedAt&&<p>מועד מבוקש: {new Date(item.requestedAt).toLocaleString('he-IL')}</p>}
-       {item.imageId&&<a href={getPrivateImageUrl(item.imageId)} target="_blank" rel="noreferrer">צפייה בתמונה שצורפה</a>}
-     </div>)}</div>
-     <b>{o.has_custom ? `מחיר חלקי: ${money(o.total)} (לא כולל הזמנות אישיות)` : `מחיר סופי: ${money(o.total)}`}</b>
-     <select value={o.status} onChange={e=>change(o.id,e.target.value)}>
-       <option value="new">חדשה</option><option value="confirmed">אושרה</option>
-       <option value="preparing">בהכנה</option><option value="completed">הושלמה</option>
-       <option value="cancelled">בוטלה</option>
-     </select>
-   </article>)}</div>}
- {screen==='add'&&<form className="admin-product-form" onSubmit={save}><h2>הוספת מוצר</h2>
-   <label className="field-label">שם מוצר</label><input required value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/>
-   <label className="field-label">קטגוריה</label><select value={form.categoryId} onChange={e=>setForm({...form,categoryId:e.target.value})}>{categories.filter(c=>c.id!=='custom').map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
-   <label className="field-label">מחיר</label><input type="number" min="0" required value={form.price} onChange={e=>setForm({...form,price:e.target.value})}/>
-   <input aria-label="בחירת קובץ" type="file" accept="image/jpeg,image/png,image/webp" required onChange={e=>setFile(e.target.files?.[0]||null)}/>
-   <button className="button primary" disabled={busy}>שמירה</button>
- </form>}
- {screen==='delete'&&<div><h2>מחיקת מוצר</h2><label className="field-label">קטגוריה</label>
-   <select value={category} onChange={e=>setCategory(e.target.value)}>{categories.filter(c=>c.id!=='custom').map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
-   <div className="admin-products">{products.filter(p=>p.categoryId===category).map(p=><div className="cart-row" key={p.id}>
-     <img src={p.image} alt=""/><div className="cart-item-copy"><b>{p.name}</b><small>{money(p.price)}</small></div>
-     <button className="button outline" onClick={()=>remove(p.id)}>מחיקה</button>
-   </div>)}</div>
+
+ {screen==='home'&&<div className="admin-three-actions">
+ <button onClick={()=>setScreen('orders')}>הזמנות</button>
+ <button onClick={()=>setScreen('add')}>הוספת מוצר</button>
+ <button onClick={()=>setScreen('delete')}>מחיקת מוצר</button>
  </div>}
+ {screen==='orders'&&<div><h2>הזמנות</h2><button className="button outline" onClick={async()=>{
+   if(!('Notification' in window)){setError('הדפדפן אינו תומך בהתראות.');return;}
+   const permission=await Notification.requestPermission();
+   if(permission==='granted')setAlerts(true);
+   else setError('יש לאשר הרשאת התראות.');
+ }}>התראה להזמנה חדשה כשהניהול פתוח</button>{orders.length===0?<p>אין הזמנות עדיין</p>:orders.map(o=><article key={o.id} className="admin-order"><h3>{o.customer_name} — {o.phone}</h3><small>{new Date(o.created_at).toLocaleDateString('he-IL')} · {o.requested_date||'ללא תאריך מבוקש'}</small><div>{(o.items||[]).map((item,i)=><p key={i}>{item.name} × {item.quantity}{item.note&&' — '+item.note}{item.description&&' — '+item.description}{item.image&&<a href={item.image} target="_blank" rel="noreferrer"> · תמונה מצורפת</a>}</p>)}</div><b>{o.items?.some(item=>item.custom) ? `סכום ביניים: ${money(o.total)}` : `מחיר סופי: ${money(o.total)}`}</b><select value={o.status} onChange={e=>change(o.id,e.target.value)}><option value="new">חדשה</option><option value="confirmed">אושרה</option><option value="preparing">בהכנה</option><option value="completed">הושלמה</option><option value="cancelled">בוטלה</option></select></article>)}</div>}
+ {screen==='add'&&<form className="admin-product-form" onSubmit={save}><h2>הוספת מוצר</h2>
+ <label className="field-label">שם מוצר</label><input required value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/>
+ <label className="field-label">קטגוריה</label><select value={form.categoryId} onChange={e=>setForm({...form,categoryId:e.target.value})}>{categories.filter(c=>c.id!=='custom').map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
+ <label className="field-label">מחיר</label><input type="number" min="0" required value={form.price} onChange={e=>setForm({...form,price:e.target.value})}/>
+ <input aria-label="בחירת קובץ" type="file" accept="image/jpeg,image/png,image/webp" required onChange={e=>setFile(e.target.files?.[0]||null)}/>
+ <button className="button primary" disabled={busy}>שמירה</button></form>}
+ {screen==='delete'&&<div><h2>מחיקת מוצר</h2><label className="field-label">קטגוריה</label><select value={category} onChange={e=>setCategory(e.target.value)}>{categories.filter(c=>c.id!=='custom').map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><div className="admin-products">{products.filter(p=>p.categoryId===category).map(p=><div className="cart-row" key={p.id}><img src={p.image} alt=""/><div className="cart-item-copy"><b>{p.name}</b><small>{money(p.price)}</small></div><button className="button outline" onClick={()=>remove(p.id)}>מחיקה</button></div>)}</div></div>}
  </section>;
 }
 
