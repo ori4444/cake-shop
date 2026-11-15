@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter, Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   CakeSlice, ShoppingBag, ArrowLeft, ArrowRight, Plus, Minus, Trash2, Heart,
   Menu, X, Check, ChevronDown, Bell, Package, ClipboardList, ImagePlus, Upload,
@@ -84,29 +84,39 @@ function AdminInstallGate({children}) {
 }
 
 function RoutesView(props) {
-  const loc = useLocation();
-  useEffect(() => window.scrollTo(0, 0), [loc.pathname]);
+  const location = useLocation();
+  useEffect(() => window.scrollTo(0, 0), [location.pathname]);
   if (ADMIN_SITE) return <Admin {...props} />;
-  if (loc.pathname.startsWith('/admin')) return <Home {...props} />;
-  if (loc.pathname === '/checkout') return <Checkout {...props} />;
-  if (loc.pathname === '/custom') return <Custom {...props} />;
-  if (loc.pathname.startsWith('/category/')) return <Category {...props} />;
-  if (loc.pathname.startsWith('/product/')) return <Product {...props} />;
-  return <Home {...props} />;
+  return <Routes>
+    <Route path="/" element={<Home {...props} />} />
+    <Route path="/category/:id" element={<Category {...props} />} />
+    <Route path="/product/:id" element={<Product {...props} />} />
+    <Route path="/custom" element={<Custom {...props} />} />
+    <Route path="/checkout" element={<Checkout {...props} />} />
+    <Route path="*" element={<NotFound />} />
+  </Routes>;
 }
 
+// The back button must always work, even when the page was opened directly.
 function CustomerBack() {
-  const location = useLocation();
+  const { pathname } = useLocation();
   const navigate = useNavigate();
-  if (location.pathname === '/' || location.pathname.startsWith('/admin')) return null;
+  if (pathname === '/' || pathname.startsWith('/admin')) return null;
   const back = () => {
-    // A direct visit has no previous in-site entry; use a safe parent instead.
-    if (window.history.state?.idx > 0) navigate(-1);
-    else if (location.pathname.startsWith('/product/')) {
-      const productId = location.pathname.split('/')[2];
-      const categoryId = initialProducts.find(product => product.id === productId)?.categoryId;
-      navigate(categoryId ? `/category/${categoryId}` : '/');
-    } else navigate('/');
+    if (pathname.startsWith('/category/') || pathname === '/custom') {
+      navigate('/');
+      return;
+    }
+    if (pathname.startsWith('/product/')) {
+      const productId = decodeURIComponent(pathname.split('/')[2] || '');
+      // Use the category from the current URL history when available;
+      // otherwise the home page is always a safe destination.
+      const product = initialProducts.find(item => item.id === productId);
+      if (product) navigate(`/category/${product.categoryId}`);
+      else navigate('/');
+      return;
+    }
+    navigate('/');
   };
   return <nav className="customer-back-nav" aria-label="ניווט חזרה">
     <button type="button" onClick={back}><ArrowRight size={18} /> חזרה אחורה</button>
