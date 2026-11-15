@@ -67,3 +67,22 @@
 .admin-page:has(.admin-three-actions) .admin-three-actions{width:min(100%,500px);max-width:500px;margin:auto;display:grid;grid-template-columns:minmax(0,1fr);gap:20px}
 .admin-page:has(.admin-three-actions) .admin-install-tip{align-self:stretch;text-align:center}
 @media(max-width:600px){.admin-page:has(.admin-three-actions) .admin-three-actions{gap:16px}.admin-page:has(.admin-three-actions) .admin-three-actions button{min-height:94px}}
+
+/* Notification permission reminder — shown on each launch until permission is granted. */
+.admin-notification-prompt{
+ width:min(100%,540px);box-sizing:border-box;display:flex;align-items:flex-start;gap:14px;
+ margin:0 auto 20px;padding:18px;border:1px solid #e4d5c4;border-radius:16px;
+ background:#fffaf3;box-shadow:0 4px 18px #0000000a;
+}
+.admin-notification-prompt>svg{flex-shrink:0;margin-top:2px;color:#75523a}
+.admin-notification-copy{flex:1;min-width:0}
+.admin-notification-copy strong{font-size:17px}
+.admin-notification-copy p{font-size:13px;line-height:1.7;margin:5px 0 0}
+.admin-notification-buttons{display:flex;flex-direction:column;gap:8px}
+.admin-notification-buttons button{white-space:nowrap;font-size:13px;min-height:38px}
+.admin-page:has(.admin-three-actions) .admin-notification-prompt{margin-top:0}
+@media(max-width:560px){
+ .admin-notification-prompt{flex-wrap:wrap;gap:10px;padding:15px}
+ .admin-notification-buttons{width:100%;flex-direction:row}
+ .admin-notification-buttons button{flex:1;min-width:0}
+}
