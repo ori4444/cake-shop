@@ -60,3 +60,12 @@
 .custom-simple input[type="file"]{padding:12px;border:1px solid var(--line);background:white}
 .custom-simple .custom-preview{width:110px;height:110px;object-fit:cover;margin-top:12px;border-radius:8px}
 .custom-simple>.button{margin-top:14px}
+
+.admin-notifications{display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:30px}
+.admin-notifications>button{display:inline-flex;gap:7px;align-items:center;justify-content:center}
+.admin-notifications>p{font-size:12px;color:var(--brown)}
+.admin-order{padding:16px 0;border-bottom:1px solid var(--line)}
+.admin-order h3{font-size:17px}.admin-order small{display:block;color:var(--muted)}
+.admin-order-item{padding:8px 0}.admin-order-item p{margin:5px 0;font-size:13px}
+.admin-order-item a{color:var(--brown);text-decoration:underline}
+.admin-order select{display:block;margin:12px 0;width:auto}
