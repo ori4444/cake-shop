@@ -17,22 +17,43 @@ export async function getProducts() {
   const data = await request('/rest/v1/products?select=*&active=eq.true&order=created_at.asc');
   return data.map(p => ({ ...p, categoryId: p.category_id }));
 }
-export async function signIn(email, password) {
+export async function signIn(email, password, setupCode = '') {
   session = await request('/auth/v1/token?grant_type=password', { method: 'POST', body: JSON.stringify({ email, password }) });
   localStorage.setItem(tokenKey, JSON.stringify(session));
-  const admins = await request('/rest/v1/admin_users?select=user_id&user_id=eq.' + encodeURIComponent(session.user.id), {}, true);
-  if (!admins.length) { signOut(); throw new Error('החשבון אינו מורשה לניהול'); }
-  return session.user;
+  try {
+    if (setupCode.trim()) await claimInitialAdmin(setupCode.trim());
+    const admins = await request('/rest/v1/admin_users?select=user_id&user_id=eq.' + encodeURIComponent(session.user.id), {}, true);
+    if (!admins.length) throw new Error('החשבון אינו מורשה לניהול. בהרשמה ראשונה יש להזין קוד הקמה.');
+    return session.user;
+  } catch(error) {
+    signOut();
+    throw error;
+  }
 }
-export async function signUp(email, password) {
+async function claimInitialAdmin(code) {
+  return request('/rest/v1/rpc/claim_initial_admin', {
+    method: 'POST',
+    body: JSON.stringify({ setup_code: code })
+  }, true);
+}
+export async function signUp(email, password, setupCode) {
   if (!configured) throw new Error('Supabase לא הוגדר ב־Vercel');
   const result = await request('/auth/v1/signup', {
     method: 'POST',
     body: JSON.stringify({ email: email.trim(), password })
   });
-  // Registration alone must not authorize access to admin operations.
-  // A verified account is added to admin_users only via a protected server-side approval.
-  return result;
+  if (result.access_token) {
+    session = result;
+    localStorage.setItem(tokenKey, JSON.stringify(session));
+    try {
+      await claimInitialAdmin(setupCode.trim());
+      return { activated: true, user: result.user };
+    } catch (error) {
+      signOut();
+      throw error;
+    }
+  }
+  return { activated: false };
 }
 export function signOut() { session = null; localStorage.removeItem(tokenKey); }
 export async function isAdmin() {
