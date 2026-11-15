@@ -86,7 +86,7 @@ function AdminInstallGate({children}) {
 function RoutesView(props) {
   const loc = useLocation();
   useEffect(() => window.scrollTo(0, 0), [loc.pathname]);
-  if (ADMIN_SITE) return <AdminInstallGate><Admin {...props} /></AdminInstallGate>;
+  if (ADMIN_SITE) return <Admin {...props} />;
   if (loc.pathname.startsWith('/admin')) return <Home {...props} />;
   if (loc.pathname === '/checkout') return <Checkout {...props} />;
   if (loc.pathname === '/custom') return <Custom {...props} />;
@@ -377,54 +377,19 @@ function Checkout({ cart, setCart, changeQuantity, removeFromCart }) {
 }
 
 function Admin({ reload }) {
- const [user,setUser]=useState(null),[checking,setChecking]=useState(true);
- const [email,setEmail]=useState(''),[password,setPassword]=useState('');
- const [registering,setRegistering]=useState(false),[notice,setNotice]=useState(''),[setupCode,setSetupCode]=useState('');
  const [error,setError]=useState(''),[orders,setOrders]=useState([]),[products,setProducts]=useState([]);
  const [screen,setScreen]=useState('home'),[busy,setBusy]=useState(false),[category,setCategory]=useState('yeast');
  const [form,setForm]=useState({name:'',categoryId:'yeast',price:'',image:''}),[file,setFile]=useState(null);
- const refresh=async()=>{const p=await getProducts();setProducts(p);await reload();if(await isAdmin())setOrders(await getOrders())};
- useEffect(()=>{isAdmin().then(ok=>{if(ok){setUser(authUser());refresh().catch(e=>setError(e.message))}}).finally(()=>setChecking(false))},[]);
- const login=async e=>{
-  e.preventDefault();setBusy(true);setError('');setNotice('');
-  try {
-    if (registering) {
-      if (password.length < 8) throw Error('יש לבחור סיסמה של לפחות 8 תווים');
-      if (!setupCode.trim()) throw Error('יש להזין קוד הקמה חד־פעמי');
-      const account = await signUp(email,password,setupCode);
-      if (account.activated) {
-        setUser(account.user);await refresh();
-      } else {
-        setNotice('נשלח מייל לאימות החשבון. לאחר האימות יש להתחבר עם אותה סיסמה וקוד ההקמה.');
-        setRegistering(false);
-      }
-    } else {
-      setUser(await signIn(email,password,setupCode));await refresh();
-    }
-  } catch(err) {setError(err.message)}
-  finally {setBusy(false)}
+ const refresh=async()=>{
+   const [p,o]=await Promise.all([getProducts(),getOrders()]);
+   setProducts(p);setOrders(o);await reload();
  };
+ useEffect(()=>{refresh().catch(e=>setError(e.message))},[]);
  const change=async(id,status)=>{try{await changeOrder(id,status);await refresh()}catch(err){setError(err.message)}};
  const save=async e=>{e.preventDefault();setBusy(true);setError('');try{if(!file)throw Error('יש לבחור תמונה למוצר');const image=await uploadImage(file);await saveProduct({...form,description:'',image});setForm({name:'',categoryId:'yeast',price:'',image:''});setFile(null);await refresh();setScreen('home')}catch(err){setError(err.message)}finally{setBusy(false)}};
  const remove=async id=>{if(!window.confirm('למחוק את המוצר?'))return;try{await disableProduct(id);await refresh()}catch(err){setError(err.message)}};
- if(checking)return <section className="admin-page">טוענים…</section>;
- if(!user)return <section className="admin-page admin-login-page"><div className="admin-login">
-  <h1>{registering?'הרשמת מנהלת':'כניסה למנהלת'}</h1>
-  <form onSubmit={login}>
-   <label className="field-label">אימייל</label>
-   <input type="email" required autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)}/>
-   <label className="field-label">סיסמה</label>
-   <input type="password" required minLength={registering?8:undefined} autoComplete={registering?'new-password':'current-password'} value={password} onChange={e=>setPassword(e.target.value)}/>
-   <label className="field-label">קוד הקמה חד־פעמי {registering?'*':'(רק בהתחברות הראשונה)'}</label>
-   <input value={setupCode} onChange={e=>setSetupCode(e.target.value)} required={registering} autoComplete="off" placeholder="קוד ההקמה שקיבלת"/>
-   {error&&<p className="error-msg" role="alert">{error}</p>}
-   {notice&&<p role="status">{notice}</p>}
-   <button className="button primary full" disabled={busy}>{busy?'ממתינים…':registering?'יצירת חשבון':'כניסה'}</button>
-  </form>
-  <button type="button" className="button outline full" onClick={()=>{setRegistering(v=>!v);setError('');setNotice('')}}>{registering?'יש לי חשבון — התחברות':'אין לי חשבון — הרשמה'}</button>
-  {registering&&<p>קוד ההקמה מאשר את המנהלת הראשונה בלבד. אחר כך לא ניתן להירשם כמנהלת נוספת באמצעותו.</p>}
- </div></section>;
  return <section className="admin-page">
+ {screen==='home'&&<p className="admin-install-tip">להתקנה בטלפון: באנדרואיד פתחי את תפריט Chrome ובחרי ״התקנת אפליקציה״; באייפון פתחי ב־Safari, לחצי על שיתוף ואז ״הוסף למסך הבית״.</p>}
  {screen!=='home'&&<button className="button outline" onClick={()=>{setScreen('home');setError('')}}>חזרה</button>}
  {error&&<p className="error-msg">{error}</p>}
 
