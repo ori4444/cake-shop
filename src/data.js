@@ -1,4 +1,4 @@
-export const categories=[
+export let categories=[
  {id:'yeast',name:'עוגות שמרים ובחושות',short:'ריח של בית, ביס של אושר',image:'https://images.unsplash.com/photo-1608198093002-ad4e0054841b?auto=format&fit=crop&w=1100&q=85'},
  {id:'cookies',name:'עוגיות',short:'קטנות, פריכות וממכרות',image:'https://images.unsplash.com/photo-1499636136210-6f4ee915583e?auto=format&fit=crop&w=1100&q=85'},
  {id:'desserts',name:'קינוחים',short:'רגע מתוק לעצמך',image:'https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=1100&q=85'},
@@ -6,6 +6,10 @@ export const categories=[
  {id:'cheesecake',name:'עוגות גבינה',short:'רכות, עשירות ומפנקות',image:'https://images.unsplash.com/photo-1533134242443-d4fd215305ad?auto=format&fit=crop&w=1100&q=85'},
  {id:'custom',name:'עוגה בעיצוב אישי',short:'אתם חולמים, אנחנו אופים',image:'https://images.unsplash.com/photo-1558301211-0d8c8ddee6ec?auto=format&fit=crop&w=1100&q=85'}
 ];
+export function applyCategoryImages(savedImages) {
+ const byId = new Map(savedImages.map(item => [item.category_id, item.image]));
+ categories = categories.map(category => ({ ...category, image: byId.get(category.id) || category.image }));
+}
 // Real decorative cake photographs from Unsplash, separate from the mousse products.
 export const customCakeImages = [
  'https://images.unsplash.com/photo-1558301211-0d8c8ddee6ec?auto=format&fit=crop&w=850&q=82',
