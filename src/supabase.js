@@ -24,6 +24,16 @@ export async function signIn(email, password) {
   if (!admins.length) { signOut(); throw new Error('החשבון אינו מורשה לניהול'); }
   return session.user;
 }
+export async function signUp(email, password) {
+  if (!configured) throw new Error('Supabase לא הוגדר ב־Vercel');
+  const result = await request('/auth/v1/signup', {
+    method: 'POST',
+    body: JSON.stringify({ email: email.trim(), password })
+  });
+  // Registration alone must not authorize access to admin operations.
+  // A verified account is added to admin_users only via a protected server-side approval.
+  return result;
+}
 export function signOut() { session = null; localStorage.removeItem(tokenKey); }
 export async function isAdmin() {
   if (!session?.access_token) return false;
