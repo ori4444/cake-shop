@@ -376,6 +376,42 @@ function Checkout({ cart, setCart, changeQuantity, removeFromCart }) {
   </section>;
 }
 
+function AdminNotificationPrompt() {
+ const supported = typeof Notification !== 'undefined' && 'serviceWorker' in navigator && window.isSecureContext;
+ const [permission,setPermission]=useState(()=>supported ? Notification.permission : 'unsupported');
+ const [dismissed,setDismissed]=useState(false);
+ const [busy,setBusy]=useState(false);
+ useEffect(()=>{
+  const sync=()=>setPermission(supported ? Notification.permission : 'unsupported');
+  document.addEventListener('visibilitychange',sync);
+  window.addEventListener('focus',sync);
+  return ()=>{document.removeEventListener('visibilitychange',sync);window.removeEventListener('focus',sync)};
+ },[supported]);
+ if (permission === 'granted' || dismissed) return null;
+ const enable=async()=>{
+  if(!supported)return;
+  setBusy(true);
+  try { setPermission(await Notification.requestPermission()); }
+  catch { setPermission(Notification.permission); }
+  finally { setBusy(false); }
+ };
+ return <div className="admin-notification-prompt" role="region" aria-label="הפעלת התראות">
+  <Bell size={24} aria-hidden="true"/>
+  <div className="admin-notification-copy">
+   <strong>הפעלת התראות</strong>
+   <p>{permission==='denied'
+     ? 'ההתראות חסומות בדפדפן. כדי לאפשר אותן, היכנסי להגדרות האתר בטלפון ושני את הרשאת ההתראות ל״אפשר״.'
+     : permission==='unsupported'
+       ? 'הדפדפן אינו מאפשר בקשת התראות כאן. פתחי את האפליקציה המותקנת ממסך הבית.'
+       : 'כדי לקבל התראות מהאפליקציה, אשרי את הרשאת ההתראות.'}</p>
+  </div>
+  <div className="admin-notification-buttons">
+   {permission==='default'&&<button type="button" className="button primary" onClick={enable} disabled={busy}>{busy?'מבקשים אישור…':'אישור התראות'}</button>}
+   <button type="button" className="button outline" onClick={()=>setDismissed(true)}>אחר כך</button>
+  </div>
+ </div>;
+}
+
 function Admin({ reload }) {
  const installed = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
  const [error,setError]=useState(''),[orders,setOrders]=useState([]),[products,setProducts]=useState([]);
@@ -397,6 +433,7 @@ function Admin({ reload }) {
  const save=async e=>{e.preventDefault();setBusy(true);setError('');try{if(!file)throw Error('יש לבחור תמונה למוצר');const image=await uploadImage(file);notify('התמונה עלתה בהצלחה');await saveProduct({...form,description:'',image});setForm({name:'',categoryId:'yeast',price:'',image:''});setFile(null);await refresh();setScreen('home');notify('המוצר נוסף בהצלחה')}catch(err){setError(err.message)}finally{setBusy(false)}};
  const remove=async id=>{if(!window.confirm('למחוק את המוצר?'))return;try{setError('');await disableProduct(id);await refresh();notify('המוצר נמחק בהצלחה')}catch(err){setError(err.message)}};
  return <section className="admin-page">
+ <AdminNotificationPrompt />
  {toast&&<div className="admin-toast" key={toast.id} role="status" aria-live="polite"><Check size={19} aria-hidden="true"/>{toast.message}</div>}
  {screen==='home'&&!installed&&<p className="admin-install-tip">להתקנה בטלפון: באנדרואיד פתחי את תפריט Chrome ובחרי ״התקנת אפליקציה״; באייפון פתחי ב־Safari, לחצי על שיתוף ואז ״הוסף למסך הבית״.</p>}
  {screen!=='home'&&<button className="button outline" onClick={()=>{setScreen('home');setError('')}}>חזרה</button>}
