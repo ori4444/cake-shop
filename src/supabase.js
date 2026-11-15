@@ -73,6 +73,8 @@ export async function saveProduct(data, id) {
 }
 export async function disableProduct(id) { return request('/rest/v1/products?id=eq.' + encodeURIComponent(id), { method: 'PATCH', body: JSON.stringify({ active: false }) }, true); }
 export async function uploadImage(file) {
+  if (!['image/jpeg','image/png','image/webp'].includes(file.type) || file.size > 8 * 1024 * 1024)
+    throw new Error('אפשר להעלות תמונות JPG, PNG או WebP עד 8MB.');
   const path = crypto.randomUUID() + '-' + file.name.replace(/[^a-zA-Z0-9.]/g, '');
   const response = await fetch(url + '/storage/v1/object/cake-images/' + path, { method: 'POST', headers: { ...headers(true), 'Content-Type': file.type }, body: file });
   if (!response.ok) throw new Error('העלאת התמונה נכשלה');
@@ -82,7 +84,7 @@ export async function placeOrder(data) {
   return request('/rest/v1/rpc/place_order', { method: 'POST', body: JSON.stringify({
     p_name: data.name, p_phone: data.phone, p_date: data.date || null,
     p_items: data.items.map(item => item.type === 'custom' ?
-      { custom: true, description: item.description, note: item.note, image: item.image?.startsWith('https://') ? item.image : '', quantity: item.quantity } :
+      { custom: true, description: item.description, note: item.requestedAt ? `מועד מבוקש: ${item.requestedAt}` : '', image: item.uploadedImage || '', quantity: item.quantity } :
       { productId: item.productId, quantity: item.quantity, note: item.note })
   }) });
 }
