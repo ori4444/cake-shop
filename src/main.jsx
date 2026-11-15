@@ -6,7 +6,7 @@ import {
   Menu, X, Check, ChevronDown, Bell, Package, ClipboardList, ImagePlus, Upload,
   Clock, LoaderCircle, Pencil, Save, LogOut,
 } from 'lucide-react';
-import { categories, initialProducts, money } from './data';
+import { categories, customCakeImages, initialProducts, money } from './data';
 import { configured, getProducts, authUser, signIn, signUp, signOut, isAdmin, getOrders, changeOrder, saveProduct, disableProduct, uploadImage, placeOrder } from './supabase';
 import './styles.css';
 
@@ -46,6 +46,7 @@ function App() {
   return <>
     
     <main className="main">
+      {!ADMIN_SITE && <CustomerBack />}
       <RoutesView {...shop} cart={cart} setCart={setCart} addToCart={addToCart}
         removeFromCart={removeFromCart} changeQuantity={changeQuantity} />
     </main>
@@ -92,6 +93,25 @@ function RoutesView(props) {
   if (loc.pathname.startsWith('/category/')) return <Category {...props} />;
   if (loc.pathname.startsWith('/product/')) return <Product {...props} />;
   return <Home {...props} />;
+}
+
+function CustomerBack() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  if (location.pathname === '/' || location.pathname.startsWith('/admin')) return null;
+  const back = () => {
+    // A direct visit has no previous in-site entry; use a safe parent instead.
+    if (window.history.state?.idx > 0) navigate(-1);
+    else if (location.pathname.startsWith('/product/')) {
+      const productId = location.pathname.split('/')[2];
+      const categoryId = initialProducts.find(product => product.id === productId)?.categoryId;
+      navigate(categoryId ? `/category/${categoryId}` : '/');
+    } else navigate('/');
+  };
+  return <nav className="customer-back-nav" aria-label="ניווט חזרה">
+    <button type="button" onClick={back}><ArrowRight size={18} /> חזרה אחורה</button>
+    <Link to="/">כל הקטגוריות</Link>
+  </nav>;
 }
 
 function Home({ error }) {
@@ -141,17 +161,32 @@ function Category({ products, loading, error }) {
       loading ? <p className="empty">טוענים מוצרים…</p> :
       error ? <p className="error-msg">{error}</p> :
         <p className="empty">עדיין אין מוצרים בקטגוריה הזאת.</p>}
+    <CategoryGallery categoryId={id} />
   </section>;
 }
 
-function Product({ products, addToCart }) {
+function CategoryGallery({ categoryId }) {
+  const category = categories.find(item => item.id === categoryId);
+  const images = initialProducts.filter(product => product.categoryId === categoryId).slice(0, 4);
+  if (!category || !images.length) return null;
+  return <div className="category-gallery-section">
+    <h2>עוד תמונות של {category.name}</h2>
+    <div className="category-photo-grid">
+      {images.map(product => <Link to={`/product/${product.id}`} key={product.id} aria-label={product.name}>
+        <ShopImage src={product.image} fallback={category.image} alt={product.name} loading="lazy" />
+      </Link>)}
+    </div>
+  </div>;
+}
+
+function Product({ products, loading, addToCart }) {
   const { id } = useParams();
   const product = products.find(item => item.id === id);
   const [quantity, setQuantity] = useState(1);
   const [note, setNote] = useState('');
   const [summary, setSummary] = useState(false);
   const navigate = useNavigate();
-  if (!product) return <NotFound />;
+  if (!product) return loading ? <p className="empty section">טוענים מוצר…</p> : <NotFound />;
   const item = { type: 'product', productId: product.id, name: product.name, image: product.image,
     price: product.price, quantity, note: note.trim() };
   const checkoutNow = () => {
@@ -216,10 +251,10 @@ function Custom({ addToCart }) {
         {error && <p className="error-msg">{error}</p>}
         <button className="button primary full" disabled={!description.trim() && !file} onClick={() => setSummary(true)}>המשך לסיכום <ArrowLeft size={16} /></button>
       </div></div>
-    <div className="custom-gallery" aria-label="תמונות השראה לעוגה בעיצוב אישי">
-      {initialProducts.filter(product => product.categoryId === 'mousse').map(product =>
-        <ShopImage key={product.id} src={product.image} fallback={categories[3].image}
-          alt={product.name} loading="lazy" />)}
+    <div className="custom-gallery" aria-label="ארבע תמונות השראה לעוגות בעיצוב אישי">
+      {customCakeImages.map((image, index) =>
+        <ShopImage key={image} src={image} fallback={categories[5].image}
+          alt={`עוגת יום הולדת בעיצוב אישי - דוגמה ${index + 1}`} loading="lazy" />)}
     </div>
     {summary && <SelectionSummary title={item.name} image={item.image}
       details="ממתינה להצעת מחיר" note={`${description}${note ? ` · ${note}` : ''}`}

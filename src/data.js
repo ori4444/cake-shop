@@ -6,6 +6,13 @@ export const categories=[
  {id:'cheesecake',name:'עוגות גבינה',short:'רכות, עשירות ומפנקות',image:'https://images.unsplash.com/photo-1533134242443-d4fd215305ad?auto=format&fit=crop&w=1100&q=85'},
  {id:'custom',name:'עוגה בעיצוב אישי',short:'אתם חולמים, אנחנו אופים',image:'https://images.unsplash.com/photo-1558301211-0d8c8ddee6ec?auto=format&fit=crop&w=1100&q=85'}
 ];
+// Real decorative cake photographs from Unsplash, separate from the mousse products.
+export const customCakeImages = [
+ 'https://images.unsplash.com/photo-1558301211-0d8c8ddee6ec?auto=format&fit=crop&w=850&q=82',
+ 'https://images.unsplash.com/photo-1655049117535-541607305230?auto=format&fit=crop&w=850&q=82',
+ 'https://images.unsplash.com/photo-1562440499-64c9a111f713?auto=format&fit=crop&w=850&q=82',
+ 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=850&q=82',
+];
 export const initialProducts=[
 ['p1','yeast','עוגת שמרים שוקולד',55,'עוגת שמרים רכה עם מילוי שוקולד עשיר.'],['p2','yeast','עוגת שמרים קינמון',52,'שושני שמרים ריחניות עם קינמון וסוכר חום.'],['p3','yeast','עוגת תפוזים בחושה',45,'עוגה בחושה אוורירית עם תפוזים טריים.'],['p4','yeast','עוגת שיש שוקולד וניל',48,'עוגת שיש קלאסית ורכה, בדיוק ליד הקפה.'],
 ['p5','cookies',"עוגיות שוקולד צ׳יפס",35,'עוגיות חמימות עם שוקולד צ׳יפס, 12 יחידות.'],['p6','cookies','עוגיות אלפחורס',42,'עוגיות חמאה עדינות עם ריבת חלב וקוקוס.'],['p7','cookies','עוגיות חמאה',32,'עוגיות חמאה נימוחות, 18 יחידות.'],['p8','cookies','עוגיות בראוניז',38,'עוגיות שוקולד פאדג׳יות, 10 יחידות.'],
