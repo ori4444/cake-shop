@@ -219,6 +219,7 @@ function Custom({ addToCart }) {
   const [requestedAt, setRequestedAt] = useState('');
   const [summary, setSummary] = useState(false);
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
   const navigate = useNavigate();
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
   const chooseFile = event => {
@@ -235,6 +236,17 @@ function Custom({ addToCart }) {
     image: preview || categories[5].image, description: description.trim(),
     requestedAt, quantity: 1, file };
   const checkoutNow = () => navigate('/checkout', { state: { direct: true, items: [item] } });
+  const addCustomToCart = async () => {
+    if (saving) return;
+    setSaving(true); setError('');
+    try {
+      const uploadedImage = file ? await uploadImage(file) : '';
+      addToCart({ ...item, file: null, uploadedImage, image: uploadedImage || item.image });
+      setSummary(false);
+      navigate('/');
+    } catch(err) { setError(err.message || 'העלאת התמונה נכשלה.'); setSummary(false); }
+    finally { setSaving(false); }
+  };
   return <section className="section custom-simple">
     <h1>הזמנה אישית</h1>
     <p>כתבו מה להכין, אפשר גם לצרף תמונה לדוגמה.</p>
@@ -254,18 +266,18 @@ function Custom({ addToCart }) {
     {summary && <SelectionSummary title="הזמנה אישית" image={item.image}
       details={requestedAt ? `לתאריך ${new Date(requestedAt).toLocaleString('he-IL')}` : 'ממתינה להצעת מחיר'}
       note={description} onClose={() => setSummary(false)}
-      onAdd={() => { addToCart(item); setSummary(false); navigate('/'); }} onOrder={checkoutNow} />}
+      onAdd={addCustomToCart} onOrder={checkoutNow} busy={saving} />}
   </section>;
 }
 
-function SelectionSummary({ title, image, details, note, onClose, onAdd, onOrder }) {
+function SelectionSummary({ title, image, details, note, onClose, onAdd, onOrder, busy = false }) {
   return <div className="modal-backdrop" onClick={onClose}><div className="modal" onClick={e => e.stopPropagation()}>
     <button className="modal-close" onClick={onClose} aria-label="סגירה"><X /></button>
     <ShopImage className="selection-image" src={image} fallback={categories[5].image} alt={title} />
     <div className="eyebrow">סיכום בחירה</div><h2>{title}</h2><p>{details}</p>
     {note && <div className="modal-note">{note}</div>}
-    <button className="button primary full" onClick={onAdd}>הוסף למארז <ShoppingBag size={16} /></button>
-    <button className="button outline full" onClick={onOrder}>שלח הזמנה <ArrowLeft size={16} /></button>
+    <button className="button primary full" disabled={busy} onClick={onAdd}>{busy ? 'מוסיפים…' : 'הוסף למארז'} <ShoppingBag size={16} /></button>
+    <button className="button outline full" disabled={busy} onClick={onOrder}>שלח הזמנה <ArrowLeft size={16} /></button>
   </div></div>;
 }
 
@@ -340,7 +352,7 @@ function Checkout({ cart, setCart }) {
         <label className="field-label" htmlFor="phone">טלפון *</label>
         <input id="phone" type="tel" required value={phone} onChange={e => setPhone(e.target.value)} />
         <label className="field-label" htmlFor="date">מועד להזמנה כולה (לא חובה)</label>
-        <input id="date" type="datetime-local" value={date} onChange={e => setDate(e.target.value)} />
+        <input id="date" type="date" value={date} onChange={e => setDate(e.target.value)} />
         {error && <p className="error-msg">{error}</p>}
         <button type="submit" disabled={busy || !items.length} className="button primary full">
           {busy ? 'שולחים…' : 'אישור ושליחת הזמנה'} <ArrowLeft size={16} />
