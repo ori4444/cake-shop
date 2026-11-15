@@ -7,7 +7,7 @@ import {
   Clock, LoaderCircle, Pencil, Save, LogOut,
 } from 'lucide-react';
 import { categories, initialProducts, money } from './data';
-import { configured, getProducts, authUser, signIn, signOut, isAdmin, getOrders, changeOrder, saveProduct, disableProduct, uploadImage, placeOrder } from './supabase';
+import { configured, getProducts, authUser, signIn, signUp, signOut, isAdmin, getOrders, changeOrder, saveProduct, disableProduct, uploadImage, placeOrder } from './supabase';
 import './styles.css';
 
 // Each Vercel project builds a distinct public customer site or installable admin app.
@@ -344,17 +344,44 @@ function Checkout({ cart, setCart, changeQuantity, removeFromCart }) {
 function Admin({ reload }) {
  const [user,setUser]=useState(null),[checking,setChecking]=useState(true);
  const [email,setEmail]=useState(''),[password,setPassword]=useState('');
+ const [registering,setRegistering]=useState(false),[notice,setNotice]=useState('');
  const [error,setError]=useState(''),[orders,setOrders]=useState([]),[products,setProducts]=useState([]);
  const [screen,setScreen]=useState('home'),[busy,setBusy]=useState(false),[category,setCategory]=useState('yeast');
  const [form,setForm]=useState({name:'',categoryId:'yeast',price:'',image:''}),[file,setFile]=useState(null);
  const refresh=async()=>{const p=await getProducts();setProducts(p);await reload();if(await isAdmin())setOrders(await getOrders())};
  useEffect(()=>{isAdmin().then(ok=>{if(ok){setUser(authUser());refresh().catch(e=>setError(e.message))}}).finally(()=>setChecking(false))},[]);
- const login=async e=>{e.preventDefault();setBusy(true);setError('');try{setUser(await signIn(email,password));await refresh()}catch(err){setError(err.message)}finally{setBusy(false)}};
+ const login=async e=>{
+  e.preventDefault();setBusy(true);setError('');setNotice('');
+  try {
+    if (registering) {
+      if (password.length < 8) throw Error('יש לבחור סיסמה של לפחות 8 תווים');
+      await signUp(email,password);
+      setNotice('החשבון נוצר. אם נשלח מייל אימות, יש לאשר אותו. הכניסה לניהול תתאפשר לאחר אישור הרשאת מנהלת.');
+      setRegistering(false);setPassword('');
+    } else {
+      setUser(await signIn(email,password));await refresh();
+    }
+  } catch(err) {setError(err.message)}
+  finally {setBusy(false)}
+ };
  const change=async(id,status)=>{try{await changeOrder(id,status);await refresh()}catch(err){setError(err.message)}};
  const save=async e=>{e.preventDefault();setBusy(true);setError('');try{if(!file)throw Error('יש לבחור תמונה למוצר');const image=await uploadImage(file);await saveProduct({...form,description:'',image});setForm({name:'',categoryId:'yeast',price:'',image:''});setFile(null);await refresh();setScreen('home')}catch(err){setError(err.message)}finally{setBusy(false)}};
  const remove=async id=>{if(!window.confirm('למחוק את המוצר?'))return;try{await disableProduct(id);await refresh()}catch(err){setError(err.message)}};
  if(checking)return <section className="admin-page">טוענים…</section>;
- if(!user)return <section className="admin-page admin-login-page"><div className="admin-login"><h1>כניסה למנהלת</h1><form onSubmit={login}><label className="field-label">אימייל</label><input type="email" required value={email} onChange={e=>setEmail(e.target.value)}/><label className="field-label">סיסמה</label><input type="password" required value={password} onChange={e=>setPassword(e.target.value)}/>{error&&<p className="error-msg">{error}</p>}<button className="button primary full" disabled={busy}>כניסה</button></form></div></section>;
+ if(!user)return <section className="admin-page admin-login-page"><div className="admin-login">
+  <h1>{registering?'הרשמת מנהלת':'כניסה למנהלת'}</h1>
+  <form onSubmit={login}>
+   <label className="field-label">אימייל</label>
+   <input type="email" required autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)}/>
+   <label className="field-label">סיסמה</label>
+   <input type="password" required minLength={registering?8:undefined} autoComplete={registering?'new-password':'current-password'} value={password} onChange={e=>setPassword(e.target.value)}/>
+   {error&&<p className="error-msg" role="alert">{error}</p>}
+   {notice&&<p role="status">{notice}</p>}
+   <button className="button primary full" disabled={busy}>{busy?'ממתינים…':registering?'יצירת חשבון':'כניסה'}</button>
+  </form>
+  <button type="button" className="button outline full" onClick={()=>{setRegistering(v=>!v);setError('');setNotice('')}}>{registering?'יש לי חשבון — התחברות':'אין לי חשבון — הרשמה'}</button>
+  {registering&&<p>ההרשמה יוצרת חשבון. מטעמי אבטחה, הרשאת מנהלת מאושרת בנפרד.</p>}
+ </div></section>;
  return <section className="admin-page">
  {screen!=='home'&&<button className="button outline" onClick={()=>{setScreen('home');setError('')}}>חזרה</button>}
  {error&&<p className="error-msg">{error}</p>}
