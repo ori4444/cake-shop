@@ -10,6 +10,9 @@ import { categories, initialProducts, money } from './data';
 import { configured, getProducts, authUser, signIn, signOut, isAdmin, getOrders, changeOrder, saveProduct, disableProduct, uploadImage, placeOrder } from './supabase';
 import './styles.css';
 
+// Each Vercel project builds a distinct public customer site or installable admin app.
+const ADMIN_SITE = import.meta.env.VITE_SITE_ROLE === 'admin';
+
 function useShop() {
  const [products,setProducts]=useState(initialProducts);
  const [loading,setLoading]=useState(true);
@@ -46,12 +49,12 @@ function App() {
       <RoutesView {...shop} cart={cart} setCart={setCart} addToCart={addToCart}
         removeFromCart={removeFromCart} changeQuantity={changeQuantity} />
     </main>
-    {!window.location.pathname.startsWith("/admin") && <Footer />}
-    {count > 0 && <button className="cart-float" onClick={() => setDrawer(true)} aria-label="פתיחת המארז">
+    {!ADMIN_SITE && <Footer />}
+    {!ADMIN_SITE && count > 0 && <button className="cart-float" onClick={() => setDrawer(true)} aria-label="פתיחת המארז">
       <ShoppingBag size={20} /><span>המארז שלי</span><b>{count}</b>
     </button>}
-    <CartDrawer open={drawer} close={() => setDrawer(false)} cart={cart}
-      removeFromCart={removeFromCart} changeQuantity={changeQuantity} />
+    {!ADMIN_SITE && <CartDrawer open={drawer} close={() => setDrawer(false)} cart={cart}
+      removeFromCart={removeFromCart} changeQuantity={changeQuantity} />}
   </>;
 }
 
@@ -82,7 +85,8 @@ function AdminInstallGate({children}) {
 function RoutesView(props) {
   const loc = useLocation();
   useEffect(() => window.scrollTo(0, 0), [loc.pathname]);
-  if (loc.pathname.startsWith('/admin')) return <AdminInstallGate><Admin {...props} /></AdminInstallGate>;
+  if (ADMIN_SITE) return <AdminInstallGate><Admin {...props} /></AdminInstallGate>;
+  if (loc.pathname.startsWith('/admin')) return <Home {...props} />;
   if (loc.pathname === '/checkout') return <Checkout {...props} />;
   if (loc.pathname === '/custom') return <Custom {...props} />;
   if (loc.pathname.startsWith('/category/')) return <Category {...props} />;
@@ -401,7 +405,16 @@ function NotFound() {
 }
 
 function Mount() {
-  useEffect(() => { if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(console.error); }, []);
+  useEffect(() => {
+    if (!ADMIN_SITE) return;
+    document.title = 'ניהול עוגות';
+    const manifest = document.createElement('link');
+    manifest.rel = 'manifest';
+    manifest.href = '/manifest.webmanifest';
+    document.head.appendChild(manifest);
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(console.error);
+    return () => manifest.remove();
+  }, []);
   return <BrowserRouter><App /></BrowserRouter>;
 }
 
