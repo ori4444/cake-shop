@@ -105,3 +105,8 @@
 .admin-order-item{padding:8px 0}.admin-order-item p{margin:5px 0;font-size:13px}
 .admin-order-item a{color:var(--brown);text-decoration:underline}
 .admin-order select{display:block;margin:12px 0;width:auto}
+
+/* Category cover editor in admin */
+.admin-category-cover-preview{width:100%;height:230px;object-fit:cover;display:block;border-radius:12px;border:1px solid #e7dacb;background:#f6eee6}
+.admin-three-actions{margin-top:20px;margin-bottom:20px}
+@media(max-width:520px){.admin-category-cover-preview{height:185px}}
