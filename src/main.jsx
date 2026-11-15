@@ -344,7 +344,7 @@ function Checkout({ cart, setCart, changeQuantity, removeFromCart }) {
 function Admin({ reload }) {
  const [user,setUser]=useState(null),[checking,setChecking]=useState(true);
  const [email,setEmail]=useState(''),[password,setPassword]=useState('');
- const [registering,setRegistering]=useState(false),[notice,setNotice]=useState('');
+ const [registering,setRegistering]=useState(false),[notice,setNotice]=useState(''),[setupCode,setSetupCode]=useState('');
  const [error,setError]=useState(''),[orders,setOrders]=useState([]),[products,setProducts]=useState([]);
  const [screen,setScreen]=useState('home'),[busy,setBusy]=useState(false),[category,setCategory]=useState('yeast');
  const [form,setForm]=useState({name:'',categoryId:'yeast',price:'',image:''}),[file,setFile]=useState(null);
@@ -355,11 +355,16 @@ function Admin({ reload }) {
   try {
     if (registering) {
       if (password.length < 8) throw Error('יש לבחור סיסמה של לפחות 8 תווים');
-      await signUp(email,password);
-      setNotice('החשבון נוצר. אם נשלח מייל אימות, יש לאשר אותו. הכניסה לניהול תתאפשר לאחר אישור הרשאת מנהלת.');
-      setRegistering(false);setPassword('');
+      if (!setupCode.trim()) throw Error('יש להזין קוד הקמה חד־פעמי');
+      const account = await signUp(email,password,setupCode);
+      if (account.activated) {
+        setUser(account.user);await refresh();
+      } else {
+        setNotice('נשלח מייל לאימות החשבון. לאחר האימות יש להתחבר עם אותה סיסמה וקוד ההקמה.');
+        setRegistering(false);
+      }
     } else {
-      setUser(await signIn(email,password));await refresh();
+      setUser(await signIn(email,password,setupCode));await refresh();
     }
   } catch(err) {setError(err.message)}
   finally {setBusy(false)}
@@ -375,12 +380,14 @@ function Admin({ reload }) {
    <input type="email" required autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)}/>
    <label className="field-label">סיסמה</label>
    <input type="password" required minLength={registering?8:undefined} autoComplete={registering?'new-password':'current-password'} value={password} onChange={e=>setPassword(e.target.value)}/>
+   <label className="field-label">קוד הקמה חד־פעמי {registering?'*':'(רק בהתחברות הראשונה)'}</label>
+   <input value={setupCode} onChange={e=>setSetupCode(e.target.value)} required={registering} autoComplete="off" placeholder="קוד ההקמה שקיבלת"/>
    {error&&<p className="error-msg" role="alert">{error}</p>}
    {notice&&<p role="status">{notice}</p>}
    <button className="button primary full" disabled={busy}>{busy?'ממתינים…':registering?'יצירת חשבון':'כניסה'}</button>
   </form>
   <button type="button" className="button outline full" onClick={()=>{setRegistering(v=>!v);setError('');setNotice('')}}>{registering?'יש לי חשבון — התחברות':'אין לי חשבון — הרשמה'}</button>
-  {registering&&<p>ההרשמה יוצרת חשבון. מטעמי אבטחה, הרשאת מנהלת מאושרת בנפרד.</p>}
+  {registering&&<p>קוד ההקמה מאשר את המנהלת הראשונה בלבד. אחר כך לא ניתן להירשם כמנהלת נוספת באמצעותו.</p>}
  </div></section>;
  return <section className="admin-page">
  {screen!=='home'&&<button className="button outline" onClick={()=>{setScreen('home');setError('')}}>חזרה</button>}
