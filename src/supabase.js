@@ -17,6 +17,16 @@ export async function getProducts() {
   const data = await request('/rest/v1/products?select=*&active=eq.true&order=created_at.asc');
   return data.map(p => ({ ...p, categoryId: p.category_id }));
 }
+export async function getCategoryImages() {
+ return request('/rest/v1/category_images?select=category_id,image');
+}
+export async function saveCategoryImage(categoryId, image) {
+ return request('/rest/v1/category_images?on_conflict=category_id', {
+  method:'POST',
+  headers:{Prefer:'resolution=merge-duplicates,return=minimal'},
+  body:JSON.stringify({category_id:categoryId,image})
+ });
+}
 export async function signIn(email, password, setupCode = '') {
   session = await request('/auth/v1/token?grant_type=password', { method: 'POST', body: JSON.stringify({ email, password }) });
   localStorage.setItem(tokenKey, JSON.stringify(session));
