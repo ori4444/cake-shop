@@ -31,7 +31,7 @@ function App() {
   useEffect(() => localStorage.setItem('cake-cart', JSON.stringify(cart, (key, value) => key === 'file' ? undefined : value)), [cart]);
 
   const addToCart = item => setCart(current => {
-    const index = current.findIndex(x => x.productId && x.productId === item.productId && x.note === item.note && x.type === item.type);
+    const index = current.findIndex(x => x.type !== 'custom' && x.productId && x.productId === item.productId && x.note === item.note && x.type === item.type);
     if (index < 0) return [...current, { ...item, key: item.key || crypto.randomUUID() }];
     const next = [...current];
     next[index] = { ...next[index], quantity: next[index].quantity + item.quantity };
@@ -189,10 +189,7 @@ function Product({ products, loading, addToCart }) {
   if (!product) return loading ? <p className="empty section">טוענים מוצר…</p> : <NotFound />;
   const item = { type: 'product', productId: product.id, name: product.name, image: product.image,
     price: product.price, quantity, note: note.trim() };
-  const checkoutNow = () => {
-    sessionStorage.setItem('cake-direct-checkout', JSON.stringify([item]));
-    navigate('/checkout', { state: { direct: true, items: [item] } });
-  };
+  const checkoutNow = () => navigate('/checkout', { state: { direct: true, items: [item] } });
   return <section className="section detail">
     <div className="breadcrumbs"><Link to="/">חזרה לכל הקטגוריות</Link><span>/</span>
       <Link to={`/category/${product.categoryId}`}>← חזרה לקטגוריה</Link>
@@ -210,7 +207,7 @@ function Product({ products, loading, addToCart }) {
       </div></div>
     {summary && <SelectionSummary title={product.name} image={product.image}
       details={`${quantity} יחידות · ${money(product.price * quantity)}`} note={note}
-      onClose={() => setSummary(false)} onAdd={() => { addToCart(item); setSummary(false); }}
+      onClose={() => setSummary(false)} onAdd={() => { addToCart(item); setSummary(false); navigate('/'); }}
       onOrder={checkoutNow} />}
   </section>;
 }
@@ -219,46 +216,45 @@ function Custom({ addToCart }) {
   const [description, setDescription] = useState('');
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState('');
-  const [note, setNote] = useState('');
+  const [requestedAt, setRequestedAt] = useState('');
   const [summary, setSummary] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
   const chooseFile = event => {
     const selected = event.target.files?.[0];
     if (!selected) return;
-    if (selected.size > 8 * 1024 * 1024) { setError('התמונה גדולה מדי. הגודל המרבי הוא 8MB.'); return; }
-    setError(''); setFile(selected); setPreview(URL.createObjectURL(selected));
+    if (!['image/jpeg','image/png','image/webp'].includes(selected.type) || selected.size > 8 * 1024 * 1024) {
+      setError('אפשר לצרף תמונת JPG, PNG או WebP עד 8MB.'); return;
+    }
+    setError('');
+    setFile(selected);
+    setPreview(URL.createObjectURL(selected));
   };
-  const item = { type: 'custom', name: 'עוגה בעיצוב אישי', image: preview || categories[5].image,
-    description: description.trim(), note: note.trim(), quantity: 1, file };
-  const orderNow = () => { sessionStorage.setItem('cake-direct-checkout', JSON.stringify([{ ...item, file: null }]));
-    navigate('/checkout', { state: { direct: true, items: [item] } }); };
-  return <section className="section detail">
-    <div className="breadcrumbs"><Link to="/">בית</Link><span>/</span><b>עוגה בעיצוב אישי</b></div>
-    <div className="custom-layout"><div className="custom-banner"><ShopImage src={categories[5].image} alt="עוגה בעיצוב אישי" />
-      <div><span>החלום שלכם, בעיצוב שלנו</span><h1>עוגה אישית<br />בעיצוב שלכם</h1></div></div>
-      <div className="custom-form"><div className="eyebrow">עוגה בעיצוב אישי</div><h2>מה תרצו שנכין?</h2>
-        <p>תארו את העוגה, צרפו תמונה להשראה או מלאו את שניהם.</p>
-        <label className="field-label" htmlFor="cake-desc">תיאור העוגה</label>
-        <textarea id="cake-desc" value={description} onChange={e => setDescription(e.target.value)}
-          placeholder="למשל: עוגת יום הולדת בנושא חלל" rows="4" />
-        <label className="field-label">תמונה להמחשה</label>
-        <label className="upload-box">{preview ? <img src={preview} /> : <><ImagePlus size={25} /><b>בחירת תמונה</b><small>PNG או JPG, עד 8MB</small></>}
-          <input type="file" accept="image/*" onChange={chooseFile} hidden /></label>
-        <label className="field-label" htmlFor="custom-note">הערות נוספות</label>
-        <textarea id="custom-note" value={note} onChange={e => setNote(e.target.value)} placeholder="אלרגיות או בקשה נוספת" rows="2" />
-        <div className="quote-note">העוגה ממתינה להצעת מחיר. ניצור קשר לאחר קבלת הבקשה.</div>
-        {error && <p className="error-msg">{error}</p>}
-        <button className="button primary full" disabled={!description.trim() && !file} onClick={() => setSummary(true)}>המשך לסיכום <ArrowLeft size={16} /></button>
-      </div></div>
-    <div className="custom-gallery" aria-label="ארבע תמונות השראה לעוגות בעיצוב אישי">
-      {customCakeImages.map((image, index) =>
-        <ShopImage key={image} src={image} fallback={categories[5].image}
-          alt={`עוגת יום הולדת בעיצוב אישי - דוגמה ${index + 1}`} loading="lazy" />)}
-    </div>
-    {summary && <SelectionSummary title={item.name} image={item.image}
-      details="ממתינה להצעת מחיר" note={`${description}${note ? ` · ${note}` : ''}`}
-      onClose={() => setSummary(false)} onAdd={() => { addToCart(item); setSummary(false); }} onOrder={orderNow} />}
+  const item = { key: crypto.randomUUID(), type: 'custom', name: 'הזמנה אישית',
+    image: preview || categories[5].image, description: description.trim(),
+    requestedAt, quantity: 1, file };
+  const checkoutNow = () => navigate('/checkout', { state: { direct: true, items: [item] } });
+  return <section className="section custom-simple">
+    <h1>הזמנה אישית</h1>
+    <p>כתבו מה להכין, אפשר גם לצרף תמונה לדוגמה.</p>
+    <label className="field-label" htmlFor="custom-description">שם / קישור / תיאור ההזמנה</label>
+    <textarea id="custom-description" rows="4" maxLength="1000" value={description} onChange={e => setDescription(e.target.value)}
+      placeholder="שם העוגה, קישור לדוגמה או תיאור חופשי" />
+    <label className="field-label" htmlFor="custom-file">תמונה להמחשה (לא חובה)</label>
+    <input id="custom-file" type="file" accept="image/jpeg,image/png,image/webp" onChange={chooseFile} />
+    {preview && <img className="custom-preview" src={preview} alt="תמונת ההשראה שצירפת" />}
+    <label className="field-label" htmlFor="custom-date">מתי צריך את ההזמנה? (לא חובה)</label>
+    <input id="custom-date" type="datetime-local" value={requestedAt} onChange={e => setRequestedAt(e.target.value)} />
+    <p className="quote-note">מחיר להזמנה אישית ייקבע לאחר בדיקת הבקשה.</p>
+    {error && <p className="error-msg">{error}</p>}
+    <button className="button primary full" disabled={!description.trim() && !file} onClick={() => setSummary(true)}>
+      המשך לסיכום <ArrowLeft size={16} />
+    </button>
+    {summary && <SelectionSummary title="הזמנה אישית" image={item.image}
+      details={requestedAt ? `לתאריך ${new Date(requestedAt).toLocaleString('he-IL')}` : 'ממתינה להצעת מחיר'}
+      note={description} onClose={() => setSummary(false)}
+      onAdd={() => { addToCart(item); setSummary(false); navigate('/'); }} onOrder={checkoutNow} />}
   </section>;
 }
 
@@ -269,43 +265,40 @@ function SelectionSummary({ title, image, details, note, onClose, onAdd, onOrder
     <div className="eyebrow">סיכום בחירה</div><h2>{title}</h2><p>{details}</p>
     {note && <div className="modal-note">{note}</div>}
     <button className="button primary full" onClick={onAdd}>הוסף למארז <ShoppingBag size={16} /></button>
-    <button className="button outline full" onClick={onOrder}>הזמן עכשיו <ArrowLeft size={16} /></button>
+    <button className="button outline full" onClick={onOrder}>שלח הזמנה <ArrowLeft size={16} /></button>
   </div></div>;
 }
 
 function CartDrawer({ open, close, cart, removeFromCart, changeQuantity }) {
   const total = cart.reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0);
+  const hasUnknownPrice = cart.some(item => item.price == null);
   return <div className={`drawer-wrap ${open ? 'show' : ''}`} onClick={close}>
     <div className="drawer" onClick={e => e.stopPropagation()}>
       <div className="drawer-head"><div><small>הבחירות שלכם</small><h2>המארז שלי <span>({cart.length})</span></h2></div>
         <button onClick={close} aria-label="סגירה"><X /></button></div>
       {cart.length ? <><div className="drawer-items">{cart.map(item => <CartRow key={item.key} item={item}
         remove={() => removeFromCart(item.key)} change={delta => changeQuantity(item.key, delta)} />)}</div>
-        <div className="drawer-total"><span>סך המוצרים המתומחרים</span><b>{money(total)}</b></div>
-        {cart.some(item => item.type === 'custom') && <small className="quote-note">המחיר אינו כולל עוגה בעיצוב אישי.</small>}
-        <Link className="button primary full" to="/checkout" onClick={close}>בצע הזמנה <ArrowLeft size={16} /></Link>
+        <div className="drawer-total"><span>{hasUnknownPrice ? "סכום ביניים (ללא הזמנות אישיות)" : "מחיר סופי"}</span><b>{money(total)}</b></div>
+        {hasUnknownPrice && <small className="quote-note">מחיר ההזמנה האישית ייקבע לאחר בדיקה.</small>}
+        <Link className="button primary full" to="/checkout" onClick={close}>אישור הזמנת המארז <ArrowLeft size={16} /></Link>
       </> : <div className="empty-cart"><ShoppingBag size={32} /><h3>המארז ריק</h3><p>בחרו מוצר כדי להוסיף אותו למארז.</p><button className="button outline" onClick={close}>המשך לגלוש</button></div>}
     </div></div>;
 }
 
 function CartRow({ item, remove, change }) {
   return <div className="cart-row"><ShopImage src={item.image} alt={item.name} /><div className="cart-item-copy"><b>{item.name}</b>
-    <small>{item.price ? money(item.price) : 'ממתינה להצעת מחיר'}</small>
-    {item.note && <small className="muted">{item.note}</small>}{item.description && <small className="muted">{item.description}</small>}
+    <small>{item.price != null ? money(item.price) : 'ממתינה להצעת מחיר'}</small>
+    {item.requestedAt && <small className="muted">צריך ל־{new Date(item.requestedAt).toLocaleString('he-IL')}</small>}{item.note && <small className="muted">{item.note}</small>}{item.description && <small className="muted">{item.description}</small>}
     <div className="quantity small"><button onClick={() => change(-1)} aria-label="הפחתת כמות"><Minus size={12} /></button>
       <b>{item.quantity}</b><button onClick={() => change(1)} aria-label="הגדלת כמות"><Plus size={12} /></button></div>
-  </div><div className="cart-row-end"><b>{item.price ? money(item.price * item.quantity) : '—'}</b>
+  </div><div className="cart-row-end"><b>{item.price != null ? money(item.price * item.quantity) : 'לפי הצעת מחיר'}</b>
     <button onClick={remove} aria-label="הסרה"><Trash2 size={15} /></button></div></div>;
 }
 
-function Checkout({ cart, setCart, changeQuantity, removeFromCart }) {
+function Checkout({ cart, setCart }) {
   const location = useLocation();
   const direct = Boolean(location.state?.direct);
-  const [items, setItems] = useState(() => {
-    if (location.state?.direct && location.state.items) return location.state.items;
-    if (direct) return [];
-    try { return JSON.parse(sessionStorage.getItem('cake-direct-checkout') || 'null') || cart; } catch { return cart; }
-  });
+  const [items] = useState(() => direct ? location.state?.items || [] : cart);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [date, setDate] = useState('');
@@ -313,64 +306,57 @@ function Checkout({ cart, setCart, changeQuantity, removeFromCart }) {
   const [done, setDone] = useState(false);
   const [error, setError] = useState('');
   const total = items.reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0);
-
-  useEffect(() => {
-    if (location.state?.direct && location.state.items) {
-      setItems(location.state.items);
-      sessionStorage.setItem('cake-direct-checkout', JSON.stringify(location.state.items.map(({ file, ...item }) => item)));
-    } else {
-      setItems(cart);
-      sessionStorage.removeItem('cake-direct-checkout');
-    }
-  }, [location.state, cart]);
-
-  const setItemQuantity = (item, delta) => {
-    if (direct) setItems(current => current.map(x => x.key === item.key ? { ...x, quantity: Math.max(1, x.quantity + delta) } : x));
-    else changeQuantity(item.key, delta);
-  };
-  const removeItem = item => {
-    if (direct) setItems(current => current.filter(x => x.key !== item.key));
-    else removeFromCart(item.key);
-  };
-
+  const hasUnknownPrice = items.some(item => item.price == null);
   const submit = async event => {
     event.preventDefault();
+    if (busy) return;
     setError('');
     if (!items.length) return setError('אין פריטים להזמנה.');
-    if (!name.trim() || phone.replace(/\\D/g, '').length < 9) return setError('נא למלא שם וטלפון תקין.');
+    if (!name.trim() || phone.replace(/\D/g, '').length < 9) return setError('נא למלא שם וטלפון תקין.');
     setBusy(true);
     try {
-      await placeOrder({name:name.trim(),phone:phone.trim(),date,items});
+      // Files are uploaded before creating the order; errors must not produce a false confirmation.
+      const prepared = await Promise.all(items.map(async item => {
+        if (item.type !== 'custom' || !item.file) return item;
+        const uploadedImage = await uploadImage(item.file);
+        return { ...item, uploadedImage };
+      }));
+      await placeOrder({ name: name.trim(), phone: phone.trim(), date, items: prepared });
       if (!direct) setCart([]);
-      sessionStorage.removeItem('cake-direct-checkout');
       setDone(true);
     } catch (err) {
-      console.error(err);
-      setError(err.message || 'לא הצלחנו לשמור את ההזמנה. נסו שוב.');
+      setError(err.message || 'שליחת ההזמנה נכשלה. נסו שוב.');
     } finally { setBusy(false); }
   };
-
   if (done) return <section className="section done-page"><span className="modal-icon"><Check /></span>
-    <div className="eyebrow">איזה כיף!</div><h1>ההזמנה התקבלה</h1>
-    <p>תודה {name}, קיבלנו את הבקשה וניצור קשר לאישור הפרטים.</p><Link className="button primary" to="/">חזרה לאתר <ArrowLeft size={16} /></Link>
-  </section>;
-
-  return <section className="section checkout"><div className="breadcrumbs"><Link to="/">בית</Link><span>/</span><b>סיכום הזמנה</b></div>
-    <div className="checkout-title"><div className="eyebrow">סיכום הזמנה</div><h1>סוגרים משהו מתוק</h1><p>מלאו פרטים וניצור קשר לאישור.</p></div>
+    <h1>ההזמנה התקבלה</h1><p>תודה {name}, ההזמנה נשלחה לניהול. ניצור קשר לאישור הפרטים.</p>
+    <Link className="button primary" to="/">חזרה לקטגוריות</Link></section>;
+  return <section className="section checkout">
+    <div className="checkout-title"><h1>סיכום הזמנה</h1><p>אישור ההזמנה שולח אותה לניהול.</p></div>
     <form className="checkout-grid" onSubmit={submit}>
       <div className="checkout-form"><h2>פרטי קשר</h2>
-        <label className="field-label" htmlFor="name">שם מלא *</label><input id="name" value={name} onChange={e => setName(e.target.value)} required placeholder="איך קוראים לכם?" />
-        <label className="field-label" htmlFor="phone">מספר טלפון *</label><input id="phone" type="tel" dir="ltr" value={phone} onChange={e => setPhone(e.target.value)} required placeholder="050-000-0000" />
-        <label className="field-label" htmlFor="date">תאריך מבוקש <small>(לא חובה)</small></label><input id="date" type="date" min={new Date().toISOString().slice(0, 10)} value={date} onChange={e => setDate(e.target.value)} />
-        <div className="privacy-note">לא צריך להירשם כדי להזמין.</div>{error && <div className="error-msg">{error}</div>}
-        <button disabled={busy || !items.length} className="button primary full">{busy ? <><LoaderCircle className="spin" size={17} /> שולחים…</> : <>אישור הזמנה <ArrowLeft size={16} /></>}</button>
+        <label className="field-label" htmlFor="name">שם מלא *</label>
+        <input id="name" required value={name} onChange={e => setName(e.target.value)} />
+        <label className="field-label" htmlFor="phone">טלפון *</label>
+        <input id="phone" type="tel" required value={phone} onChange={e => setPhone(e.target.value)} />
+        <label className="field-label" htmlFor="date">מועד להזמנה כולה (לא חובה)</label>
+        <input id="date" type="datetime-local" value={date} onChange={e => setDate(e.target.value)} />
+        {error && <p className="error-msg">{error}</p>}
+        <button type="submit" disabled={busy || !items.length} className="button primary full">
+          {busy ? 'שולחים…' : 'אישור ושליחת הזמנה'} <ArrowLeft size={16} />
+        </button>
       </div>
       <div className="order-summary"><h2>הפריטים בהזמנה <span>{items.length}</span></h2>
-        {items.length ? items.map(item => <CartRow key={item.key} item={item}
-          remove={() => removeItem(item)} change={delta => setItemQuantity(item, delta)} />) : <p className="empty">אין פריטים להזמנה</p>}
-        <div className="summary-total"><span>סך המוצרים המתומחרים</span><b>{money(total)}</b></div>
-        {items.some(item => item.type === 'custom') && <div className="quote-note">עוגה בעיצוב אישי ממתינה להצעת מחיר.</div>}
-        <div className="no-payment">אין תשלום באתר. נתאם את הפרטים מולכם.</div>
+        {items.map((item, index) => <div className="cart-row" key={item.key || index}>
+          <ShopImage src={item.image} alt={item.name} />
+          <div className="cart-item-copy"><b>{item.name} × {item.quantity}</b>
+            {item.description && <small>{item.description}</small>}
+            {item.requestedAt && <small>צריך ל־{new Date(item.requestedAt).toLocaleString('he-IL')}</small>}
+            <small>{item.price != null ? money(item.price * item.quantity) : 'מחיר לאחר בירור'}</small>
+          </div></div>)}
+        <div className="summary-total"><span>{hasUnknownPrice ? 'סכום ביניים' : 'מחיר סופי'}</span><b>{money(total)}</b></div>
+        {hasUnknownPrice && <p className="quote-note">הסכום אינו כולל הזמנות אישיות שעדיין לא תומחרו.</p>}
+        <p className="no-payment">אין חיוב באתר. אישור פרטי ההזמנה יתבצע מול העסק.</p>
       </div>
     </form>
   </section>;
@@ -424,11 +410,17 @@ function Admin({ reload }) {
  },[toast]);
  const [screen,setScreen]=useState('home'),[busy,setBusy]=useState(false),[category,setCategory]=useState('yeast');
  const [form,setForm]=useState({name:'',categoryId:'yeast',price:'',image:''}),[file,setFile]=useState(null);
+ const lastOrderRef = React.useRef(null);
  const refresh=async()=>{
    const [p,o]=await Promise.all([getProducts(),getOrders()]);
+   if(lastOrderRef.current && o.length && o[0].id !== lastOrderRef.current && 'Notification' in window && Notification.permission === 'granted') {
+      new Notification('התקבלה הזמנה חדשה', {body: `${o[0].customer_name} שלח/ה הזמנה`});
+   }
+   if(o.length)lastOrderRef.current=o[0].id;
    setProducts(p);setOrders(o);await reload();
  };
  useEffect(()=>{refresh().catch(e=>setError(e.message))},[]);
+ useEffect(()=>{if(screen!=='orders')return;const interval=setInterval(()=>refresh().catch(e=>setError(e.message)),20000);return ()=>clearInterval(interval)},[screen]);
  const change=async(id,status)=>{try{setError('');await changeOrder(id,status);await refresh();notify('סטטוס ההזמנה עודכן בהצלחה')}catch(err){setError(err.message)}};
  const save=async e=>{e.preventDefault();setBusy(true);setError('');try{if(!file)throw Error('יש לבחור תמונה למוצר');const image=await uploadImage(file);notify('התמונה עלתה בהצלחה');await saveProduct({...form,description:'',image});setForm({name:'',categoryId:'yeast',price:'',image:''});setFile(null);await refresh();setScreen('home');notify('המוצר נוסף בהצלחה')}catch(err){setError(err.message)}finally{setBusy(false)}};
  const remove=async id=>{if(!window.confirm('למחוק את המוצר?'))return;try{setError('');await disableProduct(id);await refresh();notify('המוצר נמחק בהצלחה')}catch(err){setError(err.message)}};
@@ -444,7 +436,7 @@ function Admin({ reload }) {
  <button onClick={()=>setScreen('add')}>הוספת מוצר</button>
  <button onClick={()=>setScreen('delete')}>מחיקת מוצר</button>
  </div>}
- {screen==='orders'&&<div><h2>הזמנות</h2>{orders.length===0?<p>אין הזמנות עדיין</p>:orders.map(o=><article key={o.id} className="admin-order"><h3>{o.customer_name} — {o.phone}</h3><small>{new Date(o.created_at).toLocaleDateString('he-IL')} · {o.requested_date||'ללא תאריך מבוקש'}</small><div>{(o.items||[]).map((item,i)=><p key={i}>{item.name} × {item.quantity}{item.note&&' — '+item.note}{item.description&&' — '+item.description}</p>)}</div><b>{money(o.total)}</b><select value={o.status} onChange={e=>change(o.id,e.target.value)}><option value="new">חדשה</option><option value="confirmed">אושרה</option><option value="preparing">בהכנה</option><option value="completed">הושלמה</option><option value="cancelled">בוטלה</option></select></article>)}</div>}
+ {screen==='orders'&&<div><h2>הזמנות</h2>{orders.length===0?<p>אין הזמנות עדיין</p>:orders.map(o=><article key={o.id} className="admin-order"><h3>{o.customer_name} — {o.phone}</h3><small>{new Date(o.created_at).toLocaleDateString('he-IL')} · {o.requested_date||'ללא תאריך מבוקש'}</small><div>{(o.items||[]).map((item,i)=><p key={i}>{item.name} × {item.quantity}{item.note&&' — '+item.note}{item.description&&' — '+item.description}{item.image&&<a href={item.image} target="_blank" rel="noreferrer"> · תמונה מצורפת</a>}</p>)}</div><b>{o.items?.some(item=>item.custom) ? `סכום ביניים: ${money(o.total)}` : `מחיר סופי: ${money(o.total)}`}</b><select value={o.status} onChange={e=>change(o.id,e.target.value)}><option value="new">חדשה</option><option value="confirmed">אושרה</option><option value="preparing">בהכנה</option><option value="completed">הושלמה</option><option value="cancelled">בוטלה</option></select></article>)}</div>}
  {screen==='add'&&<form className="admin-product-form" onSubmit={save}><h2>הוספת מוצר</h2>
  <label className="field-label">שם מוצר</label><input required value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/>
  <label className="field-label">קטגוריה</label><select value={form.categoryId} onChange={e=>setForm({...form,categoryId:e.target.value})}>{categories.filter(c=>c.id!=='custom').map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
