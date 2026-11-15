@@ -433,6 +433,13 @@ function Admin({ reload }) {
  const [screen,setScreen]=useState('home'),[busy,setBusy]=useState(false),[category,setCategory]=useState('yeast');
  const [form,setForm]=useState({name:'',categoryId:'yeast',price:'',image:''}),[file,setFile]=useState(null);
  const [coverCategory,setCoverCategory]=useState('yeast'),[coverFile,setCoverFile]=useState(null);
+ const [coverPreview,setCoverPreview]=useState('');
+ useEffect(()=>{
+  if(!coverFile){setCoverPreview('');return}
+  const url=URL.createObjectURL(coverFile);
+  setCoverPreview(url);
+  return ()=>URL.revokeObjectURL(url);
+ },[coverFile]);
  const lastOrderRef = React.useRef(null);
  const refresh=async()=>{
    const [p,o]=await Promise.all([getProducts(),getOrders()]);
@@ -487,7 +494,7 @@ function Admin({ reload }) {
    {categories.map(category=><option key={category.id} value={category.id}>{category.name}</option>)}
   </select>
   <label className="field-label">תמונת הקטגוריה הנוכחית</label>
-  <ShopImage className="admin-category-cover-preview" src={categories.find(category=>category.id===coverCategory)?.image} alt="תמונת הקטגוריה" />
+  <ShopImage className="admin-category-cover-preview" src={coverPreview || categories.find(category=>category.id===coverCategory)?.image} alt="תמונת הקטגוריה" />
   <label className="field-label" htmlFor="cover-image-file">תמונה חדשה (JPG, PNG או WebP)</label>
   <input id="cover-image-file" key={coverCategory} type="file" accept="image/jpeg,image/png,image/webp" required onChange={e=>setCoverFile(e.target.files?.[0]||null)}/>
   <button className="button primary" disabled={busy||!coverFile}>{busy?'שומרים…':'שמירת תמונת הקטגוריה'}</button>
