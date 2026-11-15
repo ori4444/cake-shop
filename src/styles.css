@@ -50,3 +50,13 @@
 .category-photo-grid a:hover img{transform:scale(1.035)}
 .custom-gallery img{object-fit:cover}
 @media(max-width:600px){.customer-back-nav{padding:12px 19px 0}.category-photo-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.category-photo-grid img{height:145px}.category-gallery-section{margin-top:32px}}
+
+/* Compact custom order */
+.custom-simple{max-width:540px;margin:0 auto;min-height:65vh;padding-top:42px;padding-bottom:65px}
+.custom-simple h1{font-size:32px;text-align:center;margin:0 0 10px}
+.custom-simple>p:not(.quote-note):not(.error-msg){font-size:13px;color:var(--muted);text-align:center;margin:0 0 25px}
+.custom-simple .field-label{display:block;margin:17px 0 7px}
+.custom-simple textarea,.custom-simple input[type="datetime-local"],.custom-simple input[type="file"]{width:100%;box-sizing:border-box}
+.custom-simple input[type="file"]{padding:12px;border:1px solid var(--line);background:white}
+.custom-simple .custom-preview{width:110px;height:110px;object-fit:cover;margin-top:12px;border-radius:8px}
+.custom-simple>.button{margin-top:14px}
