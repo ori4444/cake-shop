@@ -377,6 +377,7 @@ function Checkout({ cart, setCart, changeQuantity, removeFromCart }) {
 }
 
 function Admin({ reload }) {
+ const installed = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
  const [error,setError]=useState(''),[orders,setOrders]=useState([]),[products,setProducts]=useState([]);
  const [screen,setScreen]=useState('home'),[busy,setBusy]=useState(false),[category,setCategory]=useState('yeast');
  const [form,setForm]=useState({name:'',categoryId:'yeast',price:'',image:''}),[file,setFile]=useState(null);
@@ -389,7 +390,7 @@ function Admin({ reload }) {
  const save=async e=>{e.preventDefault();setBusy(true);setError('');try{if(!file)throw Error('יש לבחור תמונה למוצר');const image=await uploadImage(file);await saveProduct({...form,description:'',image});setForm({name:'',categoryId:'yeast',price:'',image:''});setFile(null);await refresh();setScreen('home')}catch(err){setError(err.message)}finally{setBusy(false)}};
  const remove=async id=>{if(!window.confirm('למחוק את המוצר?'))return;try{await disableProduct(id);await refresh()}catch(err){setError(err.message)}};
  return <section className="admin-page">
- {screen==='home'&&<p className="admin-install-tip">להתקנה בטלפון: באנדרואיד פתחי את תפריט Chrome ובחרי ״התקנת אפליקציה״; באייפון פתחי ב־Safari, לחצי על שיתוף ואז ״הוסף למסך הבית״.</p>}
+ {screen==='home'&&!installed&&<p className="admin-install-tip">להתקנה בטלפון: באנדרואיד פתחי את תפריט Chrome ובחרי ״התקנת אפליקציה״; באייפון פתחי ב־Safari, לחצי על שיתוף ואז ״הוסף למסך הבית״.</p>}
  {screen!=='home'&&<button className="button outline" onClick={()=>{setScreen('home');setError('')}}>חזרה</button>}
  {error&&<p className="error-msg">{error}</p>}
 
