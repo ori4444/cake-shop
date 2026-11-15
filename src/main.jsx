@@ -6,8 +6,8 @@ import {
   Menu, X, Check, ChevronDown, Bell, Package, ClipboardList, ImagePlus, Upload,
   Clock, LoaderCircle, Pencil, Save, LogOut,
 } from 'lucide-react';
-import { categories, customCakeImages, initialProducts, money } from './data';
-import { configured, getProducts, authUser, signIn, signUp, signOut, isAdmin, getOrders, changeOrder, saveProduct, disableProduct, uploadImage, placeOrder } from './supabase';
+import { categories, applyCategoryImages, customCakeImages, initialProducts, money } from './data';
+import { configured, getProducts, getCategoryImages, saveCategoryImage, authUser, signIn, signUp, signOut, isAdmin, getOrders, changeOrder, saveProduct, disableProduct, uploadImage, placeOrder } from './supabase';
 import './styles.css';
 
 // Each Vercel project builds a distinct public customer site or installable admin app.
@@ -17,7 +17,7 @@ function useShop() {
  const [products,setProducts]=useState(initialProducts);
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState('');
- const reload=async()=>{setLoading(true);setError('');try{setProducts(await getProducts())}catch(e){setError(e.message)}finally{setLoading(false)}};
+ const reload=async()=>{setLoading(true);setError('');try{const [products, savedImages] = await Promise.all([getProducts(), getCategoryImages()]);applyCategoryImages(savedImages);setProducts(products)}catch(e){setError(e.message)}finally{setLoading(false)}};
  useEffect(()=>{reload()},[]);
  return {products,setProducts,loading,error,reload};
 }
@@ -432,6 +432,7 @@ function Admin({ reload }) {
  },[toast]);
  const [screen,setScreen]=useState('home'),[busy,setBusy]=useState(false),[category,setCategory]=useState('yeast');
  const [form,setForm]=useState({name:'',categoryId:'yeast',price:'',image:''}),[file,setFile]=useState(null);
+ const [coverCategory,setCoverCategory]=useState('yeast'),[coverFile,setCoverFile]=useState(null);
  const lastOrderRef = React.useRef(null);
  const refresh=async()=>{
    const [p,o]=await Promise.all([getProducts(),getOrders()]);
@@ -446,6 +447,19 @@ function Admin({ reload }) {
  const change=async(id,status)=>{try{setError('');await changeOrder(id,status);await refresh();notify('סטטוס ההזמנה עודכן בהצלחה')}catch(err){setError(err.message)}};
  const save=async e=>{e.preventDefault();setBusy(true);setError('');try{if(!file)throw Error('יש לבחור תמונה למוצר');const image=await uploadImage(file);notify('התמונה עלתה בהצלחה');await saveProduct({...form,description:'',image});setForm({name:'',categoryId:'yeast',price:'',image:''});setFile(null);await refresh();setScreen('home');notify('המוצר נוסף בהצלחה')}catch(err){setError(err.message)}finally{setBusy(false)}};
  const remove=async id=>{if(!window.confirm('למחוק את המוצר?'))return;try{setError('');await disableProduct(id);await refresh();notify('המוצר נמחק בהצלחה')}catch(err){setError(err.message)}};
+ const updateCover=async e=>{
+  e.preventDefault();
+  if(!coverFile)return;
+  setBusy(true);setError('');
+  try {
+   const image=await uploadImage(coverFile);
+   await saveCategoryImage(coverCategory,image);
+   await reload();
+   setCoverFile(null);setScreen('home');
+   notify('תמונת הקטגוריה עודכנה בהצלחה');
+  } catch(err) {setError(err.message || 'שמירת התמונה נכשלה')}
+  finally {setBusy(false)}
+ };
  return <section className="admin-page">
  <AdminNotificationPrompt />
  {toast&&<div className="admin-toast" key={toast.id} role="status" aria-live="polite"><Check size={19} aria-hidden="true"/>{toast.message}</div>}
@@ -457,6 +471,7 @@ function Admin({ reload }) {
  <button onClick={()=>setScreen('orders')}>הזמנות</button>
  <button onClick={()=>setScreen('add')}>הוספת מוצר</button>
  <button onClick={()=>setScreen('delete')}>מחיקת מוצר</button>
+ <button onClick={()=>setScreen('covers')}>תמונות קטגוריות</button>
  </div>}
  {screen==='orders'&&<div><h2>הזמנות</h2>{orders.length===0?<p>אין הזמנות עדיין</p>:orders.map(o=><article key={o.id} className="admin-order"><h3>{o.customer_name} — {o.phone}</h3><small>{new Date(o.created_at).toLocaleDateString('he-IL')} · {o.requested_date||'ללא תאריך מבוקש'}</small><div>{(o.items||[]).map((item,i)=><p key={i}>{item.name} × {item.quantity}{item.note&&' — '+item.note}{item.description&&' — '+item.description}{item.image&&<a href={item.image} target="_blank" rel="noreferrer"> · תמונה מצורפת</a>}</p>)}</div><b>{o.items?.some(item=>item.custom) ? `סכום ביניים: ${money(o.total)}` : `מחיר סופי: ${money(o.total)}`}</b><select value={o.status} onChange={e=>change(o.id,e.target.value)}><option value="new">חדשה</option><option value="confirmed">אושרה</option><option value="preparing">בהכנה</option><option value="completed">הושלמה</option><option value="cancelled">בוטלה</option></select></article>)}</div>}
  {screen==='add'&&<form className="admin-product-form" onSubmit={save}><h2>הוספת מוצר</h2>
@@ -465,6 +480,18 @@ function Admin({ reload }) {
  <label className="field-label">מחיר</label><input type="number" min="0" required value={form.price} onChange={e=>setForm({...form,price:e.target.value})}/>
  <input aria-label="בחירת קובץ" type="file" accept="image/jpeg,image/png,image/webp" required onChange={e=>setFile(e.target.files?.[0]||null)}/>
  <button className="button primary" disabled={busy}>שמירה</button></form>}
+ {screen==='covers'&&<form className="admin-product-form" onSubmit={updateCover}>
+  <h2>החלפת תמונות קטגוריות</h2>
+  <label className="field-label" htmlFor="cover-category">בחרי קטגוריה</label>
+  <select id="cover-category" value={coverCategory} onChange={e=>{setCoverCategory(e.target.value);setCoverFile(null)}}>
+   {categories.map(category=><option key={category.id} value={category.id}>{category.name}</option>)}
+  </select>
+  <label className="field-label">תמונת הקטגוריה הנוכחית</label>
+  <ShopImage className="admin-category-cover-preview" src={categories.find(category=>category.id===coverCategory)?.image} alt="תמונת הקטגוריה" />
+  <label className="field-label" htmlFor="cover-image-file">תמונה חדשה (JPG, PNG או WebP)</label>
+  <input id="cover-image-file" key={coverCategory} type="file" accept="image/jpeg,image/png,image/webp" required onChange={e=>setCoverFile(e.target.files?.[0]||null)}/>
+  <button className="button primary" disabled={busy||!coverFile}>{busy?'שומרים…':'שמירת תמונת הקטגוריה'}</button>
+ </form>}
  {screen==='delete'&&<div><h2>מחיקת מוצר</h2><label className="field-label">קטגוריה</label><select value={category} onChange={e=>setCategory(e.target.value)}>{categories.filter(c=>c.id!=='custom').map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><div className="admin-products">{products.filter(p=>p.categoryId===category).map(p=><div className="cart-row" key={p.id}><img src={p.image} alt=""/><div className="cart-item-copy"><b>{p.name}</b><small>{money(p.price)}</small></div><button className="button outline" onClick={()=>remove(p.id)}>מחיקה</button></div>)}</div></div>}
  </section>;
 }
