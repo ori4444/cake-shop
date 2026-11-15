@@ -20,7 +20,11 @@ export default async function handler(req, res) {
       if (!Number.isInteger(quantity) || quantity < 1 || quantity > 50) return json(res, 400, { error: 'כמות מוצר לא תקינה.' });
       if (item.custom === true) {
         hasCustom = true;
-        storedItems.push({ custom: true, name: 'עוגה בעיצוב אישי', description: String(item.description || '').slice(0, 1000), note: String(item.note || '').slice(0, 500), quantity, imageId: String(item.imageId || '') });
+        const description = String(item.description || '').trim().slice(0, 1000);
+        const imageId = String(item.imageId || '').slice(0, 36);
+        if (!description && !imageId) return json(res, 400, { error: 'נא להוסיף תיאור או תמונה להזמנה האישית.' });
+        if (imageId && !/^[A-Za-z0-9._-]{1,36}$/.test(imageId)) return json(res, 400, { error: 'תמונה לא תקינה.' });
+        storedItems.push({ custom: true, name: 'הזמנה אישית', description, requestedAt: String(item.requestedAt || '').slice(0, 30), quantity, imageId });
         continue;
       }
       const productId = String(item.productId || '');
