@@ -1,17 +1,19 @@
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-const tokenKey = 'cake-admin-session';
-let session = null;
-try { session = JSON.parse(localStorage.getItem(tokenKey) || 'null'); } catch {}
 export const configured = Boolean(url && key);
-export const authUser = () => session?.user || null;
-export const accessToken = () => session?.access_token || null;
-const headers = (auth = false) => ({ apikey: key, Authorization: 'Bearer ' + (auth ? session?.access_token || key : key) });
-async function request(path, options = {}, auth = false) {
+async function request(path, options = {}) {
   if (!configured) throw new Error('Supabase לא הוגדר ב־Vercel');
-  const response = await fetch(url + path, { ...options, headers: { ...headers(auth), 'Content-Type': 'application/json', ...options.headers } });
+  const response = await fetch(url + path, { ...options, headers: { apikey: key, Authorization: 'Bearer ' + key, 'Content-Type': 'application/json', ...options.headers } });
   const result = await response.json().catch(() => null);
   if (!response.ok) throw new Error(result?.message || result?.error_description || result?.error || 'שגיאת שרת');
+  return result;
+}
+// Admin writes (orders/products/category images) need the service-role key, which never
+// reaches the browser; they go through our own /api/* functions instead of Supabase directly.
+async function adminRequest(path, options = {}) {
+  const response = await fetch(path, { ...options, headers: { 'Content-Type': 'application/json', ...options.headers } });
+  const result = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(result?.error || result?.message || 'שגיאת שרת');
   return result;
 }
 export async function getProducts() {
@@ -22,73 +24,22 @@ export async function getCategoryImages() {
  return request('/rest/v1/category_images?select=category_id,image');
 }
 export async function saveCategoryImage(categoryId, image) {
- return request('/rest/v1/category_images?on_conflict=category_id', {
-  method:'POST',
-  headers:{Prefer:'resolution=merge-duplicates,return=minimal'},
-  body:JSON.stringify({category_id:categoryId,image})
- });
+  return adminRequest('/api/category-images', { method: 'POST', body: JSON.stringify({ categoryId, image }) });
 }
-export async function signIn(email, password, setupCode = '') {
-  session = await request('/auth/v1/token?grant_type=password', { method: 'POST', body: JSON.stringify({ email, password }) });
-  localStorage.setItem(tokenKey, JSON.stringify(session));
-  try {
-    if (setupCode.trim()) await claimInitialAdmin(setupCode.trim());
-    const admins = await request('/rest/v1/admin_users?select=user_id&user_id=eq.' + encodeURIComponent(session.user.id), {}, true);
-    if (!admins.length) throw new Error('החשבון אינו מורשה לניהול. בהרשמה ראשונה יש להזין קוד הקמה.');
-    return session.user;
-  } catch(error) {
-    signOut();
-    throw error;
-  }
-}
-async function claimInitialAdmin(code) {
-  return request('/rest/v1/rpc/claim_initial_admin', {
-    method: 'POST',
-    body: JSON.stringify({ setup_code: code })
-  }, true);
-}
-export async function signUp(email, password, setupCode) {
-  if (!configured) throw new Error('Supabase לא הוגדר ב־Vercel');
-  const result = await request('/auth/v1/signup', {
-    method: 'POST',
-    body: JSON.stringify({ email: email.trim(), password })
-  });
-  if (result.access_token) {
-    session = result;
-    localStorage.setItem(tokenKey, JSON.stringify(session));
-    try {
-      await claimInitialAdmin(setupCode.trim());
-      return { activated: true, user: result.user };
-    } catch (error) {
-      signOut();
-      throw error;
-    }
-  }
-  return { activated: false };
-}
-export function signOut() { session = null; localStorage.removeItem(tokenKey); }
-export async function isAdmin() {
-  if (!session?.access_token) return false;
-  try {
-    const data = await request('/rest/v1/admin_users?select=user_id&user_id=eq.' + encodeURIComponent(session.user.id), {}, true);
-    return data.length > 0;
-  } catch { signOut(); return false; }
-}
-export async function getOrders() { return request('/rest/v1/orders?select=*&order=created_at.desc&limit=100', {}, true); }
-export async function changeOrder(id, status) { return request('/rest/v1/orders?id=eq.' + encodeURIComponent(id), { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status }) }, true); }
-export async function deleteOrder(id) { return request('/rest/v1/orders?id=eq.' + encodeURIComponent(id), { method: 'DELETE', headers: { Prefer: 'return=minimal' } }, true); }
+export async function getOrders() { return request('/rest/v1/orders?select=*&order=created_at.desc&limit=100'); }
+export async function deleteOrder(id) { return adminRequest('/api/orders?id=' + encodeURIComponent(id), { method: 'DELETE' }); }
 export async function saveProduct(data, id) {
-  const body = { name: data.name, category_id: data.categoryId, description: data.description, price: Number(data.price), image: data.image, active: true };
-  return request('/rest/v1/products' + (id ? '?id=eq.' + encodeURIComponent(id) : ''), {
-    method: id ? 'PATCH' : 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(id ? body : { ...body, id: crypto.randomUUID() })
-  }, true);
+  const body = { name: data.name, categoryId: data.categoryId, description: data.description, price: data.price, image: data.image };
+  return adminRequest('/api/products' + (id ? '?id=' + encodeURIComponent(id) : ''), {
+    method: id ? 'PATCH' : 'POST', body: JSON.stringify(body),
+  });
 }
-export async function disableProduct(id) { return request('/rest/v1/products?id=eq.' + encodeURIComponent(id), { method: 'PATCH', body: JSON.stringify({ active: false }) }, true); }
+export async function disableProduct(id) { return adminRequest('/api/products?id=' + encodeURIComponent(id), { method: 'DELETE' }); }
 export async function uploadImage(file) {
   if (!['image/jpeg','image/png','image/webp'].includes(file.type) || file.size > 8 * 1024 * 1024)
     throw new Error('אפשר להעלות תמונות JPG, PNG או WebP עד 8MB.');
   const path = crypto.randomUUID() + '-' + file.name.replace(/[^a-zA-Z0-9.]/g, '');
-  const response = await fetch(url + '/storage/v1/object/cake-images/' + path, { method: 'POST', headers: { ...headers(true), 'Content-Type': file.type }, body: file });
+  const response = await fetch(url + '/storage/v1/object/cake-images/' + path, { method: 'POST', headers: { apikey: key, Authorization: 'Bearer ' + key, 'Content-Type': file.type }, body: file });
   if (!response.ok) throw new Error('העלאת התמונה נכשלה');
   return url + '/storage/v1/object/public/cake-images/' + path;
 }

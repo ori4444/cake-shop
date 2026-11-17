@@ -7,7 +7,7 @@ import {
   Clock, Pencil, Save, Cookie,
 } from 'lucide-react';
 import { categories, applyCategoryImages, customCakeImages, initialProducts, money } from './data';
-import { getProducts, getCategoryImages, saveCategoryImage, accessToken, getOrders, deleteOrder, saveProduct, disableProduct, uploadImage, placeOrder } from './supabase';
+import { getProducts, getCategoryImages, saveCategoryImage, getOrders, deleteOrder, saveProduct, disableProduct, uploadImage, placeOrder } from './supabase';
 import './styles.css';
 
 // Each Vercel project builds a distinct public customer site or installable admin app.
@@ -376,7 +376,7 @@ async function subscribePush() {
  if (!subscription) subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidKey) });
  const { endpoint, keys } = subscription.toJSON();
  await fetch('/api/push-subscriptions', { method: 'POST',
-  headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + accessToken() },
+  headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ endpoint, keys }) });
 }
 

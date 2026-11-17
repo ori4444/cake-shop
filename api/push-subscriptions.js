@@ -1,11 +1,10 @@
-import { requireAdmin, supabaseAdmin } from './_supabase.js';
+import { supabaseAdmin } from './_supabase.js';
 
 const json = (res, status, data) => res.status(status).setHeader('Content-Type', 'application/json').json(data);
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return json(res, 405, { error: 'Method not allowed.' });
   try {
-    await requireAdmin(req);
     const { endpoint, keys } = req.body || {};
     if (typeof endpoint !== 'string' || !endpoint.startsWith('https://') || !keys?.p256dh || !keys?.auth)
       return json(res, 400, { error: 'פרטי Push לא תקינים.' });

@@ -16,14 +16,3 @@ export async function supabaseAdmin(path, options = {}) {
   return data;
 }
 
-export async function requireAdmin(req) {
-  const { url, serviceKey } = config();
-  const jwt = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
-  if (!jwt) throw Object.assign(new Error('נדרשת התחברות למנהלת.'), { status: 401 });
-  const userResponse = await fetch(`${url}/auth/v1/user`, { headers: { apikey: serviceKey, Authorization: `Bearer ${jwt}` } });
-  const user = await userResponse.json().catch(() => ({}));
-  if (!userResponse.ok || !user?.id) throw Object.assign(new Error('נדרשת התחברות למנהלת.'), { status: 401 });
-  const admins = await supabaseAdmin(`/rest/v1/admin_users?select=user_id&user_id=eq.${encodeURIComponent(user.id)}`);
-  if (!admins.length) throw Object.assign(new Error('אין הרשאה.'), { status: 403 });
-  return user;
-}
