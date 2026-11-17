@@ -24,7 +24,7 @@ self.addEventListener('push', event => {
   try { data = { ...data, ...event.data.json() }; } catch {}
   event.waitUntil(self.registration.showNotification(data.title, {
     body: data.body, icon: '/icon-192.png', badge: '/icon-192.png', data: { url: data.url || '/admin' },
-    dir: 'rtl', lang: 'he', tag: data.tag || 'order'
+    dir: 'rtl', lang: 'he', tag: data.tag || 'order', ...(data.image ? { image: data.image } : {})
   }));
 });
 self.addEventListener('notificationclick', event => {

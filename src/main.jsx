@@ -86,7 +86,7 @@ function AdminInstallGate({children}) {
 function RoutesView(props) {
   const location = useLocation();
   useEffect(() => { window.scrollTo(0, 0); }, [location.pathname]);
-  if (ADMIN_SITE) return <Admin {...props} />;
+  if (ADMIN_SITE) return <AdminAuth><Admin {...props} /></AdminAuth>;
   return <Routes>
     <Route path="/" element={<Home {...props} />} />
     <Route path="/category/:id" element={<Category {...props} />} />
@@ -268,7 +268,7 @@ function CartDrawer({ open, close, cart, removeFromCart, changeQuantity }) {
         <button onClick={close} aria-label="סגירה"><X /></button></div>
       {cart.length ? <><div className="drawer-items">{cart.map(item => <CartRow key={item.key} item={item}
         remove={() => removeFromCart(item.key)} change={delta => changeQuantity(item.key, delta)} />)}</div>
-        <div className="drawer-total"><span>{hasUnknownPrice ? "סכום ביניים (ללא הזמנות אישיות)" : "מחיר סופי"}</span><b>{money(total)}</b></div>
+        {!(hasUnknownPrice && !total) && <div className="drawer-total"><span>{hasUnknownPrice ? "סכום ביניים (ללא הזמנות אישיות)" : "מחיר סופי"}</span><b>{money(total)}</b></div>}
         {hasUnknownPrice && <small className="quote-note">מחיר ההזמנה האישית ייקבע לאחר בדיקה.</small>}
         <Link className="button primary full" to="/checkout" onClick={close}>לסיכום הזמנה <ArrowLeft size={16} /></Link>
       </> : <div className="empty-cart"><ShoppingBag size={32} /><h3>המארז ריק</h3><p>בחרו מוצר כדי להוסיף אותו למארז.</p><button className="button outline" onClick={close}>המשך לגלוש</button></div>}
@@ -357,9 +357,7 @@ function Checkout({ cart, setCart }) {
             {item.description && <small>{item.description}</small>}
             <small>{item.price != null ? money(item.price * item.quantity) : 'מחיר לאחר בירור'}</small>
           </div></div>)}
-        <div className="summary-total"><span>{hasUnknownPrice ? 'סכום ביניים' : 'מחיר סופי'}</span><b>{money(total)}</b></div>
-        {hasUnknownPrice && <p className="quote-note">הסכום אינו כולל הזמנות אישיות שעדיין לא תומחרו.</p>}
-        <p className="no-payment">אין חיוב באתר. אישור פרטי ההזמנה יתבצע מול העסק.</p>
+        {!(hasUnknownPrice && !total) && <div className="summary-total"><span>{hasUnknownPrice ? 'סכום ביניים' : 'מחיר סופי'}</span><b>{money(total)}</b></div>}
       </div>
     </form>
   </section>;
@@ -380,6 +378,54 @@ async function subscribePush() {
  await fetch('/api/push-subscriptions', { method: 'POST',
   headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + accessToken() },
   body: JSON.stringify({ endpoint, keys }) });
+}
+
+function AdminAuth({ children }) {
+ const [state,setState]=useState('checking'); // checking | guest | authed
+ const [mode,setMode]=useState('signin'); // signin | signup
+ const [email,setEmail]=useState(''),[password,setPassword]=useState(''),[setupCode,setSetupCode]=useState('');
+ const [busy,setBusy]=useState(false),[error,setError]=useState('');
+ useEffect(()=>{
+  (async()=>{
+   if(!configured || !authUser()){setState('guest');return}
+   try{setState(await isAdmin()?'authed':'guest')}catch{setState('guest')}
+  })();
+ },[]);
+ if(state==='checking')return <section className="admin-auth-checking"><LoaderCircle className="spin" size={28}/></section>;
+ if(state==='authed')return children;
+ const submit=async event=>{
+  event.preventDefault();
+  if(busy)return;
+  setBusy(true);setError('');
+  try{
+   if(mode==='signup'){
+    const result=await signUp(email.trim(),password,setupCode.trim());
+    if(!result.activated){setError('נשלח אימייל לאישור החשבון. אשרי אותו ואז התחברי.');setMode('signin');return}
+   } else {
+    await signIn(email.trim(),password,setupCode.trim());
+   }
+   setState('authed');
+  } catch(err){setError(err.message || 'ההתחברות נכשלה.')}
+  finally{setBusy(false)}
+ };
+ return <section className="admin-login">
+  <h1>כניסת מנהלת</h1>
+  <form onSubmit={submit}>
+   <label className="field-label" htmlFor="admin-email">אימייל</label>
+   <input id="admin-email" type="email" required value={email} onChange={e=>setEmail(e.target.value)} />
+   <label className="field-label" htmlFor="admin-password">סיסמה</label>
+   <input id="admin-password" type="password" required minLength={6} value={password} onChange={e=>setPassword(e.target.value)} />
+   {mode==='signup' && <>
+    <label className="field-label" htmlFor="admin-setup-code">קוד הקמה</label>
+    <input id="admin-setup-code" required value={setupCode} onChange={e=>setSetupCode(e.target.value)} />
+   </>}
+   {error && <p className="error-msg">{error}</p>}
+   <button className="button primary full" disabled={busy}>{busy?'מתחברים…':mode==='signup'?'יצירת חשבון מנהלת':'התחברות'}</button>
+  </form>
+  <button type="button" className="button outline full" onClick={()=>{setMode(mode==='signup'?'signin':'signup');setError('')}}>
+   {mode==='signup'?'יש לי כבר חשבון':'הקמה ראשונית עם קוד'}
+  </button>
+ </section>;
 }
 
 function AdminNotificationPrompt() {
@@ -484,6 +530,7 @@ function Admin({ reload }) {
   finally {setProductImageBusy(null)}
  };
  return <section className="admin-page">
+ <div className="admin-topbar"><button type="button" className="icon-btn" aria-label="התנתקות" onClick={()=>{if(window.confirm('להתנתק?')){signOut();window.location.reload()}}}><LogOut size={18}/></button></div>
  <AdminNotificationPrompt />
  {toast&&<div className="admin-toast" key={toast.id} role="status" aria-live="polite"><Check size={19} aria-hidden="true"/>{toast.message}</div>}
  {screen==='home'&&!installed&&<p className="admin-install-tip">להתקנה בטלפון: באנדרואיד פתחי את תפריט Chrome ובחרי ״התקנת אפליקציה״; באייפון פתחי ב־Safari, לחצי על שיתוף ואז ״הוסף למסך הבית״.</p>}
@@ -504,7 +551,7 @@ function Admin({ reload }) {
    </div></div>
   <small>{o.status==='cancelled'&&<span className="status-cancelled">בוטלה · </span>}{orderTypeOf(o)&&orderTypeOf(o)+' · '}{o.requested_date?new Date(o.requested_date).toLocaleDateString('he-IL'):'ללא תאריך מבוקש'}</small>
   <div>{(o.items||[]).map((item,i)=><div key={i} className="admin-order-item"><p>{item.name} × {item.quantity}{stripOrderTypeTag(item.note)&&' — '+stripOrderTypeTag(item.note)}{stripOrderTypeTag(item.description)&&' — '+stripOrderTypeTag(item.description)}</p>{item.image&&<img src={item.image} alt="" className="admin-order-item-img"/>}</div>)}</div>
-  <b>{o.items?.some(item=>item.custom) ? `סכום ביניים: ${money(o.total)}` : `מחיר סופי: ${money(o.total)}`}</b>
+  {Boolean(o.total) && <b>{o.items?.some(item=>item.custom) ? `סכום ביניים: ${money(o.total)}` : `מחיר סופי: ${money(o.total)}`}</b>}
  </article>)}</div>}
  {screen==='add'&&<form className="admin-product-form" onSubmit={save}><h2>הוספת מוצר</h2>
  <label className="field-label">שם מוצר</label><input required value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/>
