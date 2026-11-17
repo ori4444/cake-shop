@@ -19,17 +19,29 @@ alter table push_subscriptions enable row level security;
 -- בכוונה בלי policies: רק מפתח ה-service_role (בצד השרת) יכול לגשת לטבלה הזו.
 ```
 
-2. ב־Vercel (לפרויקט ה־Admin, לפחות) הוסיפו את משתני השרת:
+2. יש **שני** פרויקטי Vercel נפרדים (מאותו repo) — האדמין (`/api/push-subscriptions` רץ שם) והחנות הציבורית (`/api/notify-order` רץ שם, כי שם מתבצעת ההזמנה). כל פרויקט בונה ורץ בנפרד, אז כל אחד צריך את משתני הסביבה שלו — לא מספיק להגדיר רק באחד מהם:
+
+**בפרויקט ה־Admin** הוסיפו:
 
 ```text
+VITE_VAPID_PUBLIC_KEY=<מפתח VAPID ציבורי>
 SUPABASE_URL=<כתובת ה-Supabase, זהה ל-VITE_SUPABASE_URL>
 SUPABASE_SERVICE_ROLE_KEY=<service_role key מתוך Settings → API ב-Supabase; מסומן Sensitive>
+```
+
+**בפרויקט החנות הציבורית** הוסיפו:
+
+```text
+SUPABASE_URL=<אותה כתובת Supabase>
+SUPABASE_SERVICE_ROLE_KEY=<אותו service_role key; מסומן Sensitive>
 VAPID_PUBLIC_KEY=<אותו מפתח כמו VITE_VAPID_PUBLIC_KEY>
 VAPID_PRIVATE_KEY=<מפתח VAPID פרטי; מסומן Sensitive>
 VAPID_SUBJECT=mailto:<אימייל קשר>
 ```
 
-3. אחרי שמירת המשתנים, הפעילו Redeploy. בכניסה ל־`/admin` ולחיצה על **אישור התראות** המכשיר נרשם אוטומטית (`/api/push-subscriptions`), וכל הזמנה חדשה שולחת Push לכל המכשירים הרשומים (`/api/notify-order`).
+3. אחרי שמירת המשתנים **בשני הפרויקטים**, הפעילו Redeploy לשניהם. בכניסה ל־`/admin` ולחיצה על **אישור התראות** המכשיר נרשם אוטומטית (`/api/push-subscriptions`), וכל הזמנה חדשה בחנות שולחת Push לכל המכשירים הרשומים (`/api/notify-order`).
+
+4. בדיקת תקינות מהירה בלי לפתוח את האפליקציה: `POST /api/push-subscriptions` בפרויקט האדמין צריך להחזיר `401` (לא `500`) כשמבקשים בלי התחברות — `500` עם ההודעה "רישום ההתראות נכשל" סימן בטוח שחסרים `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` באותו פרויקט.
 
 > שאר התיעוד למטה מתאר את ההקמה הישנה מול Appwrite ואינו משקף את הסכימה האמיתית ב־Supabase (טבלאות `products`, `orders`, `admin_users`, `category_images`, RPC־ים `place_order` ו־`claim_initial_admin`). אם תרצו, אפשר לכתוב תיעוד מדויק למה שקיים היום ב־Supabase בנפרד.
 
