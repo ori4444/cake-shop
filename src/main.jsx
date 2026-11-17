@@ -438,7 +438,7 @@ function Admin({ reload }) {
    return ()=>clearTimeout(timer);
  },[toast]);
  const [screen,setScreen]=useState('home'),[busy,setBusy]=useState(false),[category,setCategory]=useState('yeast');
- const [form,setForm]=useState({name:'',categoryId:'yeast',price:'',image:''}),[file,setFile]=useState(null);
+ const [form,setForm]=useState({name:'',categoryId:'yeast',price:'',description:'',image:''}),[file,setFile]=useState(null);
  const [coverCategory,setCoverCategory]=useState('yeast'),[coverFile,setCoverFile]=useState(null);
  const [coverPreview,setCoverPreview]=useState('');
  const [productImageBusy,setProductImageBusy]=useState(null);
@@ -455,7 +455,7 @@ function Admin({ reload }) {
  useEffect(()=>{refresh().catch(e=>setError(e.message))},[]);
  useEffect(()=>{if(screen!=='orders')return;const interval=setInterval(()=>refresh().catch(e=>setError(e.message)),20000);return ()=>clearInterval(interval)},[screen]);
  const removeOrder=async id=>{if(!window.confirm('למחוק את ההזמנה לצמיתות?'))return;try{setError('');await deleteOrder(id);await refresh();notify('ההזמנה נמחקה בהצלחה')}catch(err){setError(err.message)}};
- const save=async e=>{e.preventDefault();setBusy(true);setError('');try{if(!file)throw Error('יש לבחור תמונה למוצר');const image=await uploadImage(file);notify('התמונה עלתה בהצלחה');await saveProduct({...form,description:'',image});setForm({name:'',categoryId:'yeast',price:'',image:''});setFile(null);await refresh();setScreen('home');notify('המוצר נוסף בהצלחה')}catch(err){setError(err.message)}finally{setBusy(false)}};
+ const save=async e=>{e.preventDefault();setBusy(true);setError('');try{if(!file)throw Error('יש לבחור תמונה למוצר');const image=await uploadImage(file);notify('התמונה עלתה בהצלחה');await saveProduct({...form,description:form.description.trim(),image});setForm({name:'',categoryId:'yeast',price:'',description:'',image:''});setFile(null);await refresh();setScreen('home');notify('המוצר נוסף בהצלחה')}catch(err){setError(err.message)}finally{setBusy(false)}};
  const remove=async id=>{if(!window.confirm('למחוק את המוצר?'))return;try{setError('');await disableProduct(id);await refresh();notify('המוצר נמחק בהצלחה')}catch(err){setError(err.message)}};
  const updateCover=async e=>{
   e.preventDefault();
@@ -505,6 +505,8 @@ function Admin({ reload }) {
  </article>)}</div>}
  {screen==='add'&&<form className="admin-product-form" onSubmit={save}><h2>הוספת מוצר</h2>
  <label className="field-label">שם מוצר</label><input required value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/>
+ <label className="field-label" htmlFor="product-description">פירוט</label>
+ <textarea id="product-description" rows="3" value={form.description} onChange={e=>setForm({...form,description:e.target.value})}/>
  <label className="field-label">קטגוריה</label><select value={form.categoryId} onChange={e=>setForm({...form,categoryId:e.target.value})}>{categories.filter(c=>c.id!=='custom').map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
  <label className="field-label">מחיר</label><input type="number" min="0" required value={form.price} onChange={e=>setForm({...form,price:e.target.value})}/>
  <label className="field-label" htmlFor="product-image-file">תמונת המוצר</label>
