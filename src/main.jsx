@@ -498,7 +498,7 @@ function Admin({ reload }) {
    <div className="admin-order-actions">
     <button type="button" className="icon-btn" aria-label="מחיקת הזמנה" onClick={()=>removeOrder(o.id)}><Trash2 size={16}/></button>
    </div></div>
-  <small>{orderTypeOf(o)&&orderTypeOf(o)+' · '}{o.requested_date?new Date(o.requested_date).toLocaleDateString('he-IL'):'ללא תאריך מבוקש'}</small>
+  <small>{orderTypeOf(o)&&orderTypeOf(o)+' · '}{o.requested_date?`לתאריך ${new Date(o.requested_date).toLocaleDateString('he-IL')}`:'ללא תאריך מבוקש'}</small>
   <div>{(o.items||[]).map((item,i)=><div key={i} className="admin-order-item"><p>{item.name} × {item.quantity}{stripOrderTypeTag(item.note)&&' — '+stripOrderTypeTag(item.note)}{stripOrderTypeTag(item.description)&&' — '+stripOrderTypeTag(item.description)}</p>{item.image&&<img src={item.image} alt="" className="admin-order-item-img"/>}</div>)}</div>
   {Boolean(o.total) && <b>{o.items?.some(item=>item.custom) ? `סכום ביניים: ${money(o.total)}` : `מחיר סופי: ${money(o.total)}`}</b>}
  </article>)}</div>}
