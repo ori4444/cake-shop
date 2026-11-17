@@ -1,8 +1,39 @@
 # פירורים של אהבה
 
-חנות עוגות בעברית, עם React/Vite, אחסון Appwrite, ממשק ניהול מוגן והודעות Push.
+חנות עוגות בעברית, עם React/Vite, אחסון Supabase, ממשק ניהול מוגן והודעות Push.
 
-## חיבור Appwrite ו־Vercel
+## הודעות Push להזמנות חדשות (Supabase)
+
+הקוד עבר מ־Appwrite ל־Supabase, אבל שרשרת ה־Push נשארה מחוברת ל־Appwrite הישן ולא עבדה בפועל (הזמנות נכנסו, אבל שום דבר לא שלח התראה, וגם מצד הלקוח לא היה קוד שנרשם ל־Push כלל). זה תוקן: ההרשמה ל־Push ושליחתה עוברות עכשיו דרך Supabase.
+
+1. ב־SQL Editor של Supabase הריצו:
+
+```sql
+create table if not exists push_subscriptions (
+  endpoint text primary key,
+  p256dh text not null,
+  auth text not null,
+  created_at timestamptz not null default now()
+);
+alter table push_subscriptions enable row level security;
+-- בכוונה בלי policies: רק מפתח ה-service_role (בצד השרת) יכול לגשת לטבלה הזו.
+```
+
+2. ב־Vercel (לפרויקט ה־Admin, לפחות) הוסיפו את משתני השרת:
+
+```text
+SUPABASE_URL=<כתובת ה-Supabase, זהה ל-VITE_SUPABASE_URL>
+SUPABASE_SERVICE_ROLE_KEY=<service_role key מתוך Settings → API ב-Supabase; מסומן Sensitive>
+VAPID_PUBLIC_KEY=<אותו מפתח כמו VITE_VAPID_PUBLIC_KEY>
+VAPID_PRIVATE_KEY=<מפתח VAPID פרטי; מסומן Sensitive>
+VAPID_SUBJECT=mailto:<אימייל קשר>
+```
+
+3. אחרי שמירת המשתנים, הפעילו Redeploy. בכניסה ל־`/admin` ולחיצה על **אישור התראות** המכשיר נרשם אוטומטית (`/api/push-subscriptions`), וכל הזמנה חדשה שולחת Push לכל המכשירים הרשומים (`/api/notify-order`).
+
+> שאר התיעוד למטה מתאר את ההקמה הישנה מול Appwrite ואינו משקף את הסכימה האמיתית ב־Supabase (טבלאות `products`, `orders`, `admin_users`, `category_images`, RPC־ים `place_order` ו־`claim_initial_admin`). אם תרצו, אפשר לכתוב תיעוד מדויק למה שקיים היום ב־Supabase בנפרד.
+
+## חיבור Appwrite ו־Vercel (ישן, לא בשימוש)
 
 1. בפרויקט Appwrite `6ae66bb4002feda402cd` הוסיפו Web platform עם כתובת אתר ה־Vercel הקבועה (למשל `cake-shop.vercel.app`).
 2. צרו מראש חשבון משתמש למנהלת ושמרו את מזהה המשתמש והאימייל שלו. כבו הרשמה ציבורית. `/admin` מאפשר כניסה רק לאימייל ולמזהה שהוגדרו.

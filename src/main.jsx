@@ -7,7 +7,7 @@ import {
   Clock, LoaderCircle, Pencil, Save, LogOut, Cookie,
 } from 'lucide-react';
 import { categories, applyCategoryImages, customCakeImages, initialProducts, money } from './data';
-import { configured, getProducts, getCategoryImages, saveCategoryImage, authUser, signIn, signUp, signOut, isAdmin, getOrders, changeOrder, saveProduct, disableProduct, uploadImage, placeOrder } from './supabase';
+import { configured, getProducts, getCategoryImages, saveCategoryImage, authUser, accessToken, signIn, signUp, signOut, isAdmin, getOrders, changeOrder, deleteOrder, saveProduct, disableProduct, uploadImage, placeOrder } from './supabase';
 import './styles.css';
 
 // Each Vercel project builds a distinct public customer site or installable admin app.
@@ -351,6 +351,23 @@ function Checkout({ cart, setCart }) {
   </section>;
 }
 
+function urlBase64ToUint8Array(base64String) {
+ const base64 = (base64String + '='.repeat((4 - base64String.length % 4) % 4)).replace(/-/g,'+').replace(/_/g,'/');
+ return Uint8Array.from([...atob(base64)].map(c=>c.charCodeAt(0)));
+}
+
+async function subscribePush() {
+ const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+ if (!vapidKey || !('serviceWorker' in navigator)) return;
+ const registration = await navigator.serviceWorker.ready;
+ let subscription = await registration.pushManager.getSubscription();
+ if (!subscription) subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidKey) });
+ const { endpoint, keys } = subscription.toJSON();
+ await fetch('/api/push-subscriptions', { method: 'POST',
+  headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + accessToken() },
+  body: JSON.stringify({ endpoint, keys }) });
+}
+
 function AdminNotificationPrompt() {
  const supported = typeof Notification !== 'undefined' && 'serviceWorker' in navigator && window.isSecureContext;
  const [permission,setPermission]=useState(()=>supported ? Notification.permission : 'unsupported');
@@ -362,11 +379,17 @@ function AdminNotificationPrompt() {
   window.addEventListener('focus',sync);
   return ()=>{document.removeEventListener('visibilitychange',sync);window.removeEventListener('focus',sync)};
  },[supported]);
+ // Re-sync the subscription on every launch: it may have expired, or the service worker may have updated.
+ useEffect(()=>{if(supported && permission==='granted')subscribePush().catch(console.error)},[supported,permission]);
  if (permission === 'granted' || dismissed) return null;
  const enable=async()=>{
   if(!supported)return;
   setBusy(true);
-  try { setPermission(await Notification.requestPermission()); }
+  try {
+   const result = await Notification.requestPermission();
+   setPermission(result);
+   if (result === 'granted') await subscribePush();
+  }
   catch { setPermission(Notification.permission); }
   finally { setBusy(false); }
  };
@@ -408,18 +431,14 @@ function Admin({ reload }) {
   setCoverPreview(url);
   return ()=>URL.revokeObjectURL(url);
  },[coverFile]);
- const lastOrderRef = React.useRef(null);
  const refresh=async()=>{
    const [p,o]=await Promise.all([getProducts(),getOrders()]);
-   if(lastOrderRef.current && o.length && o[0].id !== lastOrderRef.current && 'Notification' in window && Notification.permission === 'granted') {
-      new Notification('התקבלה הזמנה חדשה', {body: `${o[0].customer_name} שלח/ה הזמנה`});
-   }
-   if(o.length)lastOrderRef.current=o[0].id;
    setProducts(p);setOrders(o);await reload();
  };
  useEffect(()=>{refresh().catch(e=>setError(e.message))},[]);
  useEffect(()=>{if(screen!=='orders')return;const interval=setInterval(()=>refresh().catch(e=>setError(e.message)),20000);return ()=>clearInterval(interval)},[screen]);
  const change=async(id,status)=>{try{setError('');await changeOrder(id,status);await refresh();notify('סטטוס ההזמנה עודכן בהצלחה')}catch(err){setError(err.message)}};
+ const removeOrder=async id=>{if(!window.confirm('למחוק את ההזמנה לצמיתות?'))return;try{setError('');await deleteOrder(id);await refresh();notify('ההזמנה נמחקה בהצלחה')}catch(err){setError(err.message)}};
  const save=async e=>{e.preventDefault();setBusy(true);setError('');try{if(!file)throw Error('יש לבחור תמונה למוצר');const image=await uploadImage(file);notify('התמונה עלתה בהצלחה');await saveProduct({...form,description:'',image});setForm({name:'',categoryId:'yeast',price:'',image:''});setFile(null);await refresh();setScreen('home');notify('המוצר נוסף בהצלחה')}catch(err){setError(err.message)}finally{setBusy(false)}};
  const remove=async id=>{if(!window.confirm('למחוק את המוצר?'))return;try{setError('');await disableProduct(id);await refresh();notify('המוצר נמחק בהצלחה')}catch(err){setError(err.message)}};
  const updateCover=async e=>{
@@ -459,7 +478,16 @@ function Admin({ reload }) {
  <button onClick={()=>setScreen('delete')}>מחיקת מוצר</button>
  <button onClick={()=>setScreen('covers')}>תמונות קטגוריות</button>
  </div>}
- {screen==='orders'&&<div><h2>הזמנות</h2>{orders.length===0?<p>אין הזמנות עדיין</p>:orders.map(o=><article key={o.id} className="admin-order"><h3>{o.customer_name} — {o.phone}</h3><small>{new Date(o.created_at).toLocaleDateString('he-IL')} · {o.requested_date||'ללא תאריך מבוקש'}</small><div>{(o.items||[]).map((item,i)=><p key={i}>{item.name} × {item.quantity}{item.note&&' — '+item.note}{item.description&&' — '+item.description}{item.image&&<a href={item.image} target="_blank" rel="noreferrer"> · תמונה מצורפת</a>}</p>)}</div><b>{o.items?.some(item=>item.custom) ? `סכום ביניים: ${money(o.total)}` : `מחיר סופי: ${money(o.total)}`}</b><select value={o.status} onChange={e=>change(o.id,e.target.value)}><option value="new">חדשה</option><option value="confirmed">אושרה</option><option value="preparing">בהכנה</option><option value="completed">הושלמה</option><option value="cancelled">בוטלה</option></select></article>)}</div>}
+ {screen==='orders'&&<div><h2>הזמנות</h2>{orders.length===0?<p>אין הזמנות עדיין</p>:orders.map(o=><article key={o.id} className="admin-order">
+  <div className="admin-order-head"><h3>{o.customer_name} — {o.phone}</h3>
+   <div className="admin-order-actions">
+    {o.status!=='cancelled'&&<button type="button" className="icon-btn" aria-label="ביטול הזמנה" onClick={()=>{if(window.confirm('לבטל את ההזמנה?'))change(o.id,'cancelled')}}><X size={16}/></button>}
+    <button type="button" className="icon-btn" aria-label="מחיקת הזמנה" onClick={()=>removeOrder(o.id)}><Trash2 size={16}/></button>
+   </div></div>
+  <small>{o.status==='cancelled'&&<span className="status-cancelled">בוטלה · </span>}{o.requested_date?new Date(o.requested_date).toLocaleDateString('he-IL'):'ללא תאריך מבוקש'}</small>
+  <div>{(o.items||[]).map((item,i)=><div key={i} className="admin-order-item"><p>{item.name} × {item.quantity}{item.note&&' — '+item.note}{item.description&&' — '+item.description}</p>{item.image&&<img src={item.image} alt="" className="admin-order-item-img"/>}</div>)}</div>
+  <b>{o.items?.some(item=>item.custom) ? `סכום ביניים: ${money(o.total)}` : `מחיר סופי: ${money(o.total)}`}</b>
+ </article>)}</div>}
  {screen==='add'&&<form className="admin-product-form" onSubmit={save}><h2>הוספת מוצר</h2>
  <label className="field-label">שם מוצר</label><input required value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/>
  <label className="field-label">קטגוריה</label><select value={form.categoryId} onChange={e=>setForm({...form,categoryId:e.target.value})}>{categories.filter(c=>c.id!=='custom').map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>

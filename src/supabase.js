@@ -5,6 +5,7 @@ let session = null;
 try { session = JSON.parse(localStorage.getItem(tokenKey) || 'null'); } catch {}
 export const configured = Boolean(url && key);
 export const authUser = () => session?.user || null;
+export const accessToken = () => session?.access_token || null;
 const headers = (auth = false) => ({ apikey: key, Authorization: 'Bearer ' + (auth ? session?.access_token || key : key) });
 async function request(path, options = {}, auth = false) {
   if (!configured) throw new Error('Supabase לא הוגדר ב־Vercel');
@@ -75,6 +76,7 @@ export async function isAdmin() {
 }
 export async function getOrders() { return request('/rest/v1/orders?select=*&order=created_at.desc&limit=100', {}, true); }
 export async function changeOrder(id, status) { return request('/rest/v1/orders?id=eq.' + encodeURIComponent(id), { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status }) }, true); }
+export async function deleteOrder(id) { return request('/rest/v1/orders?id=eq.' + encodeURIComponent(id), { method: 'DELETE', headers: { Prefer: 'return=minimal' } }, true); }
 export async function saveProduct(data, id) {
   const body = { name: data.name, category_id: data.categoryId, description: data.description, price: Number(data.price), image: data.image, active: true };
   return request('/rest/v1/products' + (id ? '?id=eq.' + encodeURIComponent(id) : ''), {
@@ -91,10 +93,14 @@ export async function uploadImage(file) {
   return url + '/storage/v1/object/public/cake-images/' + path;
 }
 export async function placeOrder(data) {
-  return request('/rest/v1/rpc/place_order', { method: 'POST', body: JSON.stringify({
+  const result = await request('/rest/v1/rpc/place_order', { method: 'POST', body: JSON.stringify({
     p_name: data.name, p_phone: data.phone, p_date: data.date ? data.date.slice(0,10) : null,
     p_items: data.items.map(item => item.type === 'custom' ?
       { custom: true, description: item.description, note: '', image: item.uploadedImage || '', quantity: item.quantity } :
       { productId: item.productId, quantity: item.quantity, note: item.note })
   }) });
+  // Best-effort: the order is already saved, so a failed notification must never fail the checkout.
+  fetch('/api/notify-order', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ customer_name: data.name, item_count: data.items.length }) }).catch(() => {});
+  return result;
 }
