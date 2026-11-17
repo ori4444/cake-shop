@@ -93,14 +93,31 @@ export async function uploadImage(file) {
   return url + '/storage/v1/object/public/cake-images/' + path;
 }
 export async function placeOrder(data) {
-  const result = await request('/rest/v1/rpc/place_order', { method: 'POST', body: JSON.stringify({
-    p_name: data.name, p_phone: data.phone, p_date: data.date ? data.date.slice(0,10) : null,
-    p_items: data.items.map(item => item.type === 'custom' ?
+  const typeLabel = data.type === 'direct' ? 'הזמנה ישירה' : 'הזמנת מארז';
+  // The order-type tag rides inside the first item's note/description because those fields
+  // are already known to survive the place_order RPC round-trip (the admin screen renders
+  // them today); there is no separate column for it and the RPC's own source isn't in this repo.
+  const items = data.items.map((item, index) => {
+    const mapped = item.type === 'custom' ?
       { custom: true, description: item.description, note: '', image: item.uploadedImage || '', quantity: item.quantity } :
-      { productId: item.productId, quantity: item.quantity, note: item.note })
+      { productId: item.productId, quantity: item.quantity, note: item.note };
+    if (index !== 0) return mapped;
+    const tag = `סוג הזמנה: ${typeLabel}`;
+    return mapped.custom
+      ? { ...mapped, description: mapped.description ? `${tag} — ${mapped.description}` : tag }
+      : { ...mapped, note: mapped.note ? `${tag} — ${mapped.note}` : tag };
+  });
+  const result = await request('/rest/v1/rpc/place_order', { method: 'POST', body: JSON.stringify({
+    p_name: data.name, p_phone: data.phone, p_date: data.date ? data.date.slice(0,10) : null, p_items: items
   }) });
+  const hasUnknownPrice = data.items.some(item => item.price == null);
+  const total = hasUnknownPrice ? null : data.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   // Best-effort: the order is already saved, so a failed notification must never fail the checkout.
   fetch('/api/notify-order', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ customer_name: data.name, item_count: data.items.length }) }).catch(() => {});
+    body: JSON.stringify({
+      customer_name: data.name, phone: data.phone, requested_date: data.date, order_type: typeLabel,
+      items: data.items.map(item => ({ name: item.name, image: item.uploadedImage || item.image || '', price: item.price ?? null, quantity: item.quantity })),
+      total,
+    }) }).catch(() => {});
   return result;
 }

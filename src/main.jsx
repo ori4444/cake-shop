@@ -285,6 +285,15 @@ function CartRow({ item, remove, change }) {
     <button onClick={remove} aria-label="הסרה"><Trash2 size={15} /></button></div></div>;
 }
 
+// Accepts Israeli numbers with or without spaces/dashes and an optional +972/972 prefix.
+function isValidPhone(value) {
+  const digits = value.trim().replace(/[\s-]/g, '');
+  const normalized = digits.startsWith('+972') ? '0' + digits.slice(4)
+    : digits.startsWith('972') ? '0' + digits.slice(3)
+    : digits;
+  return /^0\d{8,9}$/.test(normalized);
+}
+
 function Checkout({ cart, setCart }) {
   const location = useLocation();
   const direct = Boolean(location.state?.direct);
@@ -297,12 +306,16 @@ function Checkout({ cart, setCart }) {
   const [error, setError] = useState('');
   const total = items.reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0);
   const hasUnknownPrice = items.some(item => item.price == null);
+  const phoneValid = isValidPhone(phone);
+  const formValid = Boolean(items.length) && name.trim() && phoneValid && date;
   const submit = async event => {
     event.preventDefault();
     if (busy) return;
     setError('');
     if (!items.length) return setError('אין פריטים להזמנה.');
-    if (!name.trim() || phone.replace(/\D/g, '').length < 9 || !date) return setError('נא למלא שם, טלפון תקין ומועד להזמנה.');
+    if (!name.trim()) return setError('נא למלא שם מלא.');
+    if (!phoneValid) return setError('נא למלא מספר טלפון תקין.');
+    if (!date) return setError('נא לבחור תאריך נדרש להזמנה.');
     setBusy(true);
     try {
       // Files are uploaded before creating the order; errors must not produce a false confirmation.
@@ -311,7 +324,7 @@ function Checkout({ cart, setCart }) {
         const uploadedImage = await uploadImage(item.file);
         return { ...item, uploadedImage };
       }));
-      await placeOrder({ name: name.trim(), phone: phone.trim(), date, items: prepared });
+      await placeOrder({ name: name.trim(), phone: phone.trim(), date, items: prepared, type: direct ? 'direct' : 'cart' });
       if (!direct) setCart([]);
       setDone(true);
     } catch (err) {
@@ -329,11 +342,12 @@ function Checkout({ cart, setCart }) {
         <input id="name" required value={name} onChange={e => setName(e.target.value)} />
         <label className="field-label" htmlFor="phone">טלפון *</label>
         <input id="phone" type="tel" required value={phone} onChange={e => setPhone(e.target.value)} />
-        <label className="field-label" htmlFor="date">מועד להזמנה</label>
+        {phone.trim() && !phoneValid && <small className="error-msg">מספר טלפון לא תקין</small>}
+        <label className="field-label" htmlFor="date">תאריך נדרש להזמנה *</label>
         <input id="date" type="date" required value={date} onChange={e => setDate(e.target.value)} />
         {error && <p className="error-msg">{error}</p>}
-        <button type="submit" disabled={busy || !items.length || !date} className="button primary full">
-          {busy ? 'שולחים…' : 'הזמן'} <ArrowLeft size={16} />
+        <button type="submit" disabled={busy || !formValid} className="button primary full">
+          {busy ? 'שולחים…' : 'אישור הזמנה'} <ArrowLeft size={16} />
         </button>
       </div>
       <div className="order-summary"><h2>הפריטים בהזמנה <span>{items.length}</span></h2>
@@ -410,6 +424,10 @@ function AdminNotificationPrompt() {
  </div>;
 }
 
+const ORDER_TYPE_TAG = /^סוג הזמנה: ([^—]+?)(?: — |$)/;
+const orderTypeOf = order => ORDER_TYPE_TAG.exec((order.items || [])[0]?.note || (order.items || [])[0]?.description || '')?.[1]?.trim() || null;
+const stripOrderTypeTag = text => text ? text.replace(ORDER_TYPE_TAG, '') : text;
+
 function Admin({ reload }) {
  const installed = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
  const [error,setError]=useState(''),[orders,setOrders]=useState([]),[products,setProducts]=useState([]);
@@ -484,8 +502,8 @@ function Admin({ reload }) {
     {o.status!=='cancelled'&&<button type="button" className="icon-btn" aria-label="ביטול הזמנה" onClick={()=>{if(window.confirm('לבטל את ההזמנה?'))change(o.id,'cancelled')}}><X size={16}/></button>}
     <button type="button" className="icon-btn" aria-label="מחיקת הזמנה" onClick={()=>removeOrder(o.id)}><Trash2 size={16}/></button>
    </div></div>
-  <small>{o.status==='cancelled'&&<span className="status-cancelled">בוטלה · </span>}{o.requested_date?new Date(o.requested_date).toLocaleDateString('he-IL'):'ללא תאריך מבוקש'}</small>
-  <div>{(o.items||[]).map((item,i)=><div key={i} className="admin-order-item"><p>{item.name} × {item.quantity}{item.note&&' — '+item.note}{item.description&&' — '+item.description}</p>{item.image&&<img src={item.image} alt="" className="admin-order-item-img"/>}</div>)}</div>
+  <small>{o.status==='cancelled'&&<span className="status-cancelled">בוטלה · </span>}{orderTypeOf(o)&&orderTypeOf(o)+' · '}{o.requested_date?new Date(o.requested_date).toLocaleDateString('he-IL'):'ללא תאריך מבוקש'}</small>
+  <div>{(o.items||[]).map((item,i)=><div key={i} className="admin-order-item"><p>{item.name} × {item.quantity}{stripOrderTypeTag(item.note)&&' — '+stripOrderTypeTag(item.note)}{stripOrderTypeTag(item.description)&&' — '+stripOrderTypeTag(item.description)}</p>{item.image&&<img src={item.image} alt="" className="admin-order-item-img"/>}</div>)}</div>
   <b>{o.items?.some(item=>item.custom) ? `סכום ביניים: ${money(o.total)}` : `מחיר סופי: ${money(o.total)}`}</b>
  </article>)}</div>}
  {screen==='add'&&<form className="admin-product-form" onSubmit={save}><h2>הוספת מוצר</h2>
