@@ -7,7 +7,7 @@ import {
   Clock, Pencil, Save, Cookie,
 } from 'lucide-react';
 import { categories, applyCategoryImages, customCakeImages, initialProducts, money } from './data';
-import { getProducts, getCategoryImages, saveCategoryImage, accessToken, getOrders, changeOrder, deleteOrder, saveProduct, disableProduct, uploadImage, placeOrder } from './supabase';
+import { getProducts, getCategoryImages, saveCategoryImage, accessToken, getOrders, deleteOrder, saveProduct, disableProduct, uploadImage, placeOrder } from './supabase';
 import './styles.css';
 
 // Each Vercel project builds a distinct public customer site or installable admin app.
@@ -453,7 +453,6 @@ function Admin({ reload }) {
  };
  useEffect(()=>{refresh().catch(e=>setError(e.message))},[]);
  useEffect(()=>{if(screen!=='orders')return;const interval=setInterval(()=>refresh().catch(e=>setError(e.message)),20000);return ()=>clearInterval(interval)},[screen]);
- const change=async(id,status)=>{try{setError('');await changeOrder(id,status);await refresh();notify('סטטוס ההזמנה עודכן בהצלחה')}catch(err){setError(err.message)}};
  const removeOrder=async id=>{if(!window.confirm('למחוק את ההזמנה לצמיתות?'))return;try{setError('');await deleteOrder(id);await refresh();notify('ההזמנה נמחקה בהצלחה')}catch(err){setError(err.message)}};
  const save=async e=>{e.preventDefault();setBusy(true);setError('');try{if(!file)throw Error('יש לבחור תמונה למוצר');const image=await uploadImage(file);notify('התמונה עלתה בהצלחה');await saveProduct({...form,description:'',image});setForm({name:'',categoryId:'yeast',price:'',image:''});setFile(null);await refresh();setScreen('home');notify('המוצר נוסף בהצלחה')}catch(err){setError(err.message)}finally{setBusy(false)}};
  const remove=async id=>{if(!window.confirm('למחוק את המוצר?'))return;try{setError('');await disableProduct(id);await refresh();notify('המוצר נמחק בהצלחה')}catch(err){setError(err.message)}};
@@ -497,10 +496,9 @@ function Admin({ reload }) {
  {screen==='orders'&&<div><h2>הזמנות</h2>{orders.length===0?<p>אין הזמנות עדיין</p>:orders.map(o=><article key={o.id} className="admin-order">
   <div className="admin-order-head"><h3>{o.customer_name} — {o.phone}</h3>
    <div className="admin-order-actions">
-    {o.status!=='cancelled'&&<button type="button" className="icon-btn" aria-label="ביטול הזמנה" onClick={()=>{if(window.confirm('לבטל את ההזמנה?'))change(o.id,'cancelled')}}><X size={16}/></button>}
     <button type="button" className="icon-btn" aria-label="מחיקת הזמנה" onClick={()=>removeOrder(o.id)}><Trash2 size={16}/></button>
    </div></div>
-  <small>{o.status==='cancelled'&&<span className="status-cancelled">בוטלה · </span>}{orderTypeOf(o)&&orderTypeOf(o)+' · '}{o.requested_date?new Date(o.requested_date).toLocaleDateString('he-IL'):'ללא תאריך מבוקש'}</small>
+  <small>{orderTypeOf(o)&&orderTypeOf(o)+' · '}{o.requested_date?new Date(o.requested_date).toLocaleDateString('he-IL'):'ללא תאריך מבוקש'}</small>
   <div>{(o.items||[]).map((item,i)=><div key={i} className="admin-order-item"><p>{item.name} × {item.quantity}{stripOrderTypeTag(item.note)&&' — '+stripOrderTypeTag(item.note)}{stripOrderTypeTag(item.description)&&' — '+stripOrderTypeTag(item.description)}</p>{item.image&&<img src={item.image} alt="" className="admin-order-item-img"/>}</div>)}</div>
   {Boolean(o.total) && <b>{o.items?.some(item=>item.custom) ? `סכום ביניים: ${money(o.total)}` : `מחיר סופי: ${money(o.total)}`}</b>}
  </article>)}</div>}
