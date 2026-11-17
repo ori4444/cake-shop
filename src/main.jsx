@@ -193,18 +193,15 @@ function Product({ products, loading, addToCart }) {
     price: product.price, quantity, note: note.trim() };
   const checkoutNow = () => navigate('/checkout', { state: { direct: true, items: [item] } });
   return <section className="section detail">
-    <div className="breadcrumbs"><Link to="/">חזרה לכל הקטגוריות</Link><span>/</span>
-      <Link to={`/category/${product.categoryId}`}>← חזרה לקטגוריה</Link>
-      <span>/</span><b>{product.name}</b></div>
-    <div className="detail-grid"><div className="detail-photo"><ShopImage src={product.image} fallback={categories.find(c => c.id === product.categoryId)?.image} alt={product.name} /><span className="product-tag">נאפה טרי</span></div>
-      <div className="detail-copy"><div className="eyebrow">הבחירה שלכם</div><h1>{product.name}</h1>
-        <p>{product.description}</p><div className="detail-price">{money(product.price)} <small>ליחידה</small></div>
+    <div className="detail-grid"><div className="detail-photo"><ShopImage src={product.image} fallback={categories.find(c => c.id === product.categoryId)?.image} alt={product.name} /></div>
+      <div className="detail-copy"><h1>{product.name}</h1>
+        <p>{product.description}</p><div className="detail-price">{money(product.price)}</div>
         <label className="field-label">כמות</label><div className="quantity">
           <button type="button" onClick={() => setQuantity(n => Math.max(1, n - 1))}><Minus size={15} /></button>
           <b>{quantity}</b><button type="button" onClick={() => setQuantity(n => n + 1)}><Plus size={15} /></button>
         </div>
         <label className="field-label" htmlFor="product-note">הערות למוצר</label>
-        <textarea id="product-note" value={note} onChange={e => setNote(e.target.value)} placeholder="הקדשה או בקשה מיוחדת" rows="3" />
+        <textarea id="product-note" value={note} onChange={e => setNote(e.target.value)} rows="3" />
         <button className="button primary full" onClick={() => setSummary(true)}>המשך לסיכום <ArrowLeft size={16} /></button>
       </div></div>
     {summary && <SelectionSummary title={product.name} image={product.image}
@@ -259,7 +256,7 @@ function Custom({ addToCart }) {
     <FilePicker id="custom-file" accept="image/jpeg,image/png,image/webp" required file={file} onChange={chooseFile} placeholder="בחרו תמונה להשראה" />
     {preview && <img className="custom-preview" src={preview} alt="תמונת ההשראה שצירפת" />}
     <label className="field-label" htmlFor="custom-date">מתי צריך את ההזמנה?</label>
-    <input id="custom-date" type="datetime-local" required value={requestedAt} onChange={e => setRequestedAt(e.target.value)} />
+    <input id="custom-date" type="datetime-local" step="3600" required value={requestedAt} onChange={e => setRequestedAt(e.target.value)} />
     <p className="quote-note">מחיר להזמנה אישית ייקבע לאחר בדיקת הבקשה.</p>
     {error && <p className="error-msg">{error}</p>}
     <button className="button primary full" disabled={!description.trim() || !file || !requestedAt} onClick={() => setSummary(true)}>
