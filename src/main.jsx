@@ -159,12 +159,13 @@ function FilePicker({ id, file, onChange, placeholder = 'בחרו תמונה', .
 
 function ProductCard({ product }) {
   const [loaded, setLoaded] = useState(false);
-  return <Link to={`/product/${product.id}`} className="product-card" aria-label={product.name}>
+  return <Link to={`/product/${product.id}`} className="product-card">
     <div className="product-img">
       {!loaded && <Cookie className="product-loading" size={28} aria-hidden="true" />}
       <ShopImage src={product.image} fallback={categories.find(c => c.id === product.categoryId)?.image}
         alt="" loading="lazy" className={loaded ? 'loaded' : ''} onLoad={() => setLoaded(true)} />
     </div>
+    <div className="product-copy"><h3>{product.name}</h3><span className="product-price">{money(product.price)}</span></div>
   </Link>;
 }
 
