@@ -255,14 +255,14 @@ function Custom({ addToCart }) {
     <label className="field-label" htmlFor="custom-description">שם / קישור / תיאור ההזמנה</label>
     <textarea id="custom-description" rows="4" maxLength="1000" value={description} onChange={e => setDescription(e.target.value)}
       placeholder="שם העוגה, קישור לדוגמה או תיאור חופשי" />
-    <label className="field-label" htmlFor="custom-file">תמונה להמחשה (לא חובה)</label>
-    <FilePicker id="custom-file" accept="image/jpeg,image/png,image/webp" file={file} onChange={chooseFile} placeholder="בחרו תמונה להשראה" />
+    <label className="field-label" htmlFor="custom-file">תמונה להמחשה</label>
+    <FilePicker id="custom-file" accept="image/jpeg,image/png,image/webp" required file={file} onChange={chooseFile} placeholder="בחרו תמונה להשראה" />
     {preview && <img className="custom-preview" src={preview} alt="תמונת ההשראה שצירפת" />}
     <label className="field-label" htmlFor="custom-date">מתי צריך את ההזמנה?</label>
     <input id="custom-date" type="datetime-local" required value={requestedAt} onChange={e => setRequestedAt(e.target.value)} />
     <p className="quote-note">מחיר להזמנה אישית ייקבע לאחר בדיקת הבקשה.</p>
     {error && <p className="error-msg">{error}</p>}
-    <button className="button primary full" disabled={(!description.trim() && !file) || !requestedAt} onClick={() => setSummary(true)}>
+    <button className="button primary full" disabled={!description.trim() || !file || !requestedAt} onClick={() => setSummary(true)}>
       המשך לסיכום <ArrowLeft size={16} />
     </button>
     {summary && <SelectionSummary title="הזמנה אישית" image={item.image}
