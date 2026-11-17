@@ -3,8 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   CakeSlice, ShoppingBag, ArrowLeft, ArrowRight, Plus, Minus, Trash2, Heart,
-  Menu, X, Check, ChevronDown, Bell, Package, ClipboardList, ImagePlus, Upload,
-  Clock, Pencil, Save, Cookie,
+  Menu, X, Check, Bell, Package, ClipboardList, ImagePlus, Upload,
+  Pencil, Save, Cookie,
 } from 'lucide-react';
 import { categories, applyCategoryImages, customCakeImages, initialProducts, money } from './data';
 import { getProducts, getCategoryImages, saveCategoryImage, getOrders, deleteOrder, saveProduct, disableProduct, uploadImage, placeOrder } from './supabase';
@@ -539,29 +539,6 @@ function Admin({ reload }) {
  </>}
  {screen==='delete'&&<div><h2>מחיקת מוצר</h2><label className="field-label">קטגוריה</label><select value={category} onChange={e=>setCategory(e.target.value)}>{categories.filter(c=>c.id!=='custom').map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><div className="admin-products">{products.filter(p=>p.categoryId===category).map(p=><div className="cart-row" key={p.id}><img src={p.image} alt=""/><div className="cart-item-copy"><b>{p.name}</b><small>{money(p.price)}</small></div><button className="button outline" onClick={()=>remove(p.id)}>מחיקה</button></div>)}</div></div>}
  </section>;
-}
-
-function AdminOrder({ order, update }) {
-  const [expanded, setExpanded] = useState(false);
-  const date = new Date(order.created_at || order.$createdAt).toLocaleString('he-IL', { dateStyle: 'medium', timeStyle: 'short' });
-  const items = Array.isArray(order.items) ? order.items : [];
-  return <article className="order-card"><button className="order-head" onClick={() => setExpanded(!expanded)}>
-    <div className="order-avatar">{order.customer_name?.slice(0, 1) || '?'}</div>
-    <div className="order-customer"><b>{order.customer_name}</b><a href={`https://wa.me/${(order.phone || '').replace(/\D/g, '')}`} onClick={e => e.stopPropagation()} target="_blank" rel="noreferrer" dir="ltr">{order.phone}</a><small><Clock size={12} />{date}</small></div>
-    <div className="order-meta"><b>{order.total ? money(order.total) : 'מחיר לאחר הצעה'}</b><small>{order.requested_date ? `לתאריך ${new Date(order.requested_date).toLocaleDateString('he-IL')}` : 'תאריך גמיש'}</small></div>
-    <span className={`status status-${order.status || 'new'}`}>{({ new: 'חדשה', in_progress: 'בטיפול', completed: 'הושלמה' })[order.status || 'new']}</span>
-    <ChevronDown size={17} className={expanded ? 'turned' : ''} />
-  </button>{order.has_custom && <div className="custom-flag">עוגה בעיצוב אישי — נדרשת הצעת מחיר</div>}
-    {expanded && <div className="order-details">{items.map((item, index) => <div className="order-item" key={index}>
-      {item.image && <img src={item.image} />}{item.imageId && <img src={storage.getFileView(bucketId, item.imageId).toString()} />}
-      <div><b>{item.name} {item.custom && <small className="custom-label">עיצוב אישי</small>}</b>
-        <small>{item.quantity} יח׳ · {item.unit_price ? money(item.unit_price) : 'ממתינה להצעת מחיר'}</small>
-        {item.description && <p>{item.description}</p>}{item.note && <p>הערה: {item.note}</p>}</div></div>)}
-      <div className="order-status-buttons"><span>עדכון סטטוס</span>
-        <button className={order.status === 'new' ? 'selected' : ''} onClick={() => update(order, 'new')}>חדשה</button>
-        <button className={order.status === 'in_progress' ? 'selected' : ''} onClick={() => update(order, 'in_progress')}>בטיפול</button>
-        <button className={order.status === 'completed' ? 'selected' : ''} onClick={() => update(order, 'completed')}>הושלמה</button></div>
-    </div>}</article>;
 }
 
 function Footer() { return null; }
