@@ -94,7 +94,7 @@ export async function placeOrder(data) {
   return request('/rest/v1/rpc/place_order', { method: 'POST', body: JSON.stringify({
     p_name: data.name, p_phone: data.phone, p_date: data.date ? data.date.slice(0,10) : null,
     p_items: data.items.map(item => item.type === 'custom' ?
-      { custom: true, description: item.description, note: item.requestedAt ? `מועד מבוקש: ${item.requestedAt}` : '', image: item.uploadedImage || '', quantity: item.quantity } :
+      { custom: true, description: item.description, note: '', image: item.uploadedImage || '', quantity: item.quantity } :
       { productId: item.productId, quantity: item.quantity, note: item.note })
   }) });
 }
