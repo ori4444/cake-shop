@@ -4,7 +4,7 @@ import { BrowserRouter, Routes, Route, Link, useLocation, useNavigate, useParams
 import {
   CakeSlice, ShoppingBag, ArrowLeft, ArrowRight, Plus, Minus, Trash2, Heart,
   Menu, X, Check, ChevronDown, Bell, Package, ClipboardList, ImagePlus, Upload,
-  Clock, LoaderCircle, Pencil, Save, LogOut,
+  Clock, LoaderCircle, Pencil, Save, LogOut, Cookie,
 } from 'lucide-react';
 import { categories, applyCategoryImages, customCakeImages, initialProducts, money } from './data';
 import { configured, getProducts, getCategoryImages, saveCategoryImage, authUser, signIn, signUp, signOut, isAdmin, getOrders, changeOrder, saveProduct, disableProduct, uploadImage, placeOrder } from './supabase';
@@ -46,7 +46,7 @@ function App() {
   return <>
     
     <main className="main">
-      {!ADMIN_SITE && <CustomerBack />}
+      {!ADMIN_SITE && <CustomerBack products={shop.products} />}
       <RoutesView {...shop} cart={cart} setCart={setCart} addToCart={addToCart}
         removeFromCart={removeFromCart} changeQuantity={changeQuantity} />
     </main>
@@ -85,7 +85,7 @@ function AdminInstallGate({children}) {
 
 function RoutesView(props) {
   const location = useLocation();
-  useEffect(() => window.scrollTo(0, 0), [location.pathname]);
+  useEffect(() => { window.scrollTo(0, 0); }, [location.pathname]);
   if (ADMIN_SITE) return <Admin {...props} />;
   return <Routes>
     <Route path="/" element={<Home {...props} />} />
@@ -98,7 +98,7 @@ function RoutesView(props) {
 }
 
 // The back button must always work, even when the page was opened directly.
-function CustomerBack() {
+function CustomerBack({ products = [] }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   if (pathname === '/' || pathname.startsWith('/admin')) return null;
@@ -109,9 +109,9 @@ function CustomerBack() {
     }
     if (pathname.startsWith('/product/')) {
       const productId = decodeURIComponent(pathname.split('/')[2] || '');
-      // Use the category from the current URL history when available;
+      // Use the category from the loaded products when available;
       // otherwise the home page is always a safe destination.
-      const product = initialProducts.find(item => item.id === productId);
+      const product = products.find(item => item.id === productId) || initialProducts.find(item => item.id === productId);
       if (product) navigate(`/category/${product.categoryId}`);
       else navigate('/');
       return;
@@ -119,8 +119,7 @@ function CustomerBack() {
     navigate('/');
   };
   return <nav className="customer-back-nav" aria-label="ניווט חזרה">
-    <button type="button" onClick={back}><ArrowRight size={18} /> חזרה אחורה</button>
-    <Link to="/">כל הקטגוריות</Link>
+    <button type="button" onClick={back} aria-label="חזרה אחורה"><ArrowRight size={18} /></button>
   </nav>;
 }
 
@@ -150,12 +149,22 @@ function ShopImage({ src, fallback, alt = '', ...props }) {
     }} />;
 }
 
-function ProductCard({ product, index = 0 }) {
-  return <Link to={`/product/${product.id}`} className="product-card">
-    <div className="product-img"><ShopImage src={product.image} fallback={categories.find(c => c.id === product.categoryId)?.image} alt={product.name} loading="lazy" />
-      <span className="product-tag">נאפה טרי</span><span className="product-arrow"><ArrowLeft size={17} /></span></div>
-    <div className="product-info"><div><h3>{product.name}</h3><p>{product.description}</p></div>
-      <b>{money(product.price)}</b></div>
+function FilePicker({ id, file, onChange, placeholder = 'בחרו תמונה', ...rest }) {
+  return <label htmlFor={id} className="file-picker">
+    <ImagePlus size={18} />
+    <span>{file ? file.name : placeholder}</span>
+    <input id={id} type="file" onChange={onChange} {...rest} />
+  </label>;
+}
+
+function ProductCard({ product }) {
+  const [loaded, setLoaded] = useState(false);
+  return <Link to={`/product/${product.id}`} className="product-card" aria-label={product.name}>
+    <div className="product-img">
+      {!loaded && <Cookie className="product-loading" size={28} aria-hidden="true" />}
+      <ShopImage src={product.image} fallback={categories.find(c => c.id === product.categoryId)?.image}
+        alt="" loading="lazy" className={loaded ? 'loaded' : ''} onLoad={() => setLoaded(true)} />
+    </div>
   </Link>;
 }
 
@@ -165,28 +174,11 @@ function Category({ products, loading, error }) {
   const items = products.filter(product => product.categoryId === id && product.active !== false);
   if (!category) return <NotFound />;
   return <section className="section listing">
-    <div className="breadcrumbs"><Link to="/">← חזרה לכל הקטגוריות</Link><span>/</span><b>{category.name}</b></div>
-    <div className="listing-head"><h1>{category.name}</h1></div>
-    {items.length ? <div className="product-grid">{items.map((product, i) => <ProductCard key={product.id} product={product} index={i} />)}</div> :
+    {items.length ? <div className="product-grid">{items.map(product => <ProductCard key={product.id} product={product} />)}</div> :
       loading ? <p className="empty">טוענים מוצרים…</p> :
       error ? <p className="error-msg">{error}</p> :
         <p className="empty">עדיין אין מוצרים בקטגוריה הזאת.</p>}
-    <CategoryGallery categoryId={id} />
   </section>;
-}
-
-function CategoryGallery({ categoryId }) {
-  const category = categories.find(item => item.id === categoryId);
-  const images = initialProducts.filter(product => product.categoryId === categoryId).slice(0, 4);
-  if (!category || !images.length) return null;
-  return <div className="category-gallery-section">
-    <h2>עוד תמונות של {category.name}</h2>
-    <div className="category-photo-grid">
-      {images.map(product => <Link to={`/product/${product.id}`} key={product.id} aria-label={product.name}>
-        <ShopImage src={product.image} fallback={category.image} alt={product.name} loading="lazy" />
-      </Link>)}
-    </div>
-  </div>;
 }
 
 function Product({ products, loading, addToCart }) {
@@ -264,13 +256,13 @@ function Custom({ addToCart }) {
     <textarea id="custom-description" rows="4" maxLength="1000" value={description} onChange={e => setDescription(e.target.value)}
       placeholder="שם העוגה, קישור לדוגמה או תיאור חופשי" />
     <label className="field-label" htmlFor="custom-file">תמונה להמחשה (לא חובה)</label>
-    <input id="custom-file" type="file" accept="image/jpeg,image/png,image/webp" onChange={chooseFile} />
+    <FilePicker id="custom-file" accept="image/jpeg,image/png,image/webp" file={file} onChange={chooseFile} placeholder="בחרו תמונה להשראה" />
     {preview && <img className="custom-preview" src={preview} alt="תמונת ההשראה שצירפת" />}
-    <label className="field-label" htmlFor="custom-date">מתי צריך את ההזמנה? (לא חובה)</label>
-    <input id="custom-date" type="datetime-local" value={requestedAt} onChange={e => setRequestedAt(e.target.value)} />
+    <label className="field-label" htmlFor="custom-date">מתי צריך את ההזמנה?</label>
+    <input id="custom-date" type="datetime-local" required value={requestedAt} onChange={e => setRequestedAt(e.target.value)} />
     <p className="quote-note">מחיר להזמנה אישית ייקבע לאחר בדיקת הבקשה.</p>
     {error && <p className="error-msg">{error}</p>}
-    <button className="button primary full" disabled={!description.trim() && !file} onClick={() => setSummary(true)}>
+    <button className="button primary full" disabled={(!description.trim() && !file) || !requestedAt} onClick={() => setSummary(true)}>
       המשך לסיכום <ArrowLeft size={16} />
     </button>
     {summary && <SelectionSummary title="הזמנה אישית" image={item.image}
@@ -434,6 +426,7 @@ function Admin({ reload }) {
  const [form,setForm]=useState({name:'',categoryId:'yeast',price:'',image:''}),[file,setFile]=useState(null);
  const [coverCategory,setCoverCategory]=useState('yeast'),[coverFile,setCoverFile]=useState(null);
  const [coverPreview,setCoverPreview]=useState('');
+ const [productImageBusy,setProductImageBusy]=useState(null);
  useEffect(()=>{
   if(!coverFile){setCoverPreview('');return}
   const url=URL.createObjectURL(coverFile);
@@ -467,6 +460,17 @@ function Admin({ reload }) {
   } catch(err) {setError(err.message || 'שמירת התמונה נכשלה')}
   finally {setBusy(false)}
  };
+ const replaceProductImage=async(product,newFile)=>{
+  if(!newFile)return;
+  setProductImageBusy(product.id);setError('');
+  try {
+   const image=await uploadImage(newFile);
+   await saveProduct({name:product.name,categoryId:product.categoryId,price:product.price,description:product.description||'',image},product.id);
+   await refresh();
+   notify('תמונת המוצר עודכנה בהצלחה');
+  } catch(err) {setError(err.message || 'עדכון תמונת המוצר נכשל')}
+  finally {setProductImageBusy(null)}
+ };
  return <section className="admin-page">
  <AdminNotificationPrompt />
  {toast&&<div className="admin-toast" key={toast.id} role="status" aria-live="polite"><Check size={19} aria-hidden="true"/>{toast.message}</div>}
@@ -485,20 +489,37 @@ function Admin({ reload }) {
  <label className="field-label">שם מוצר</label><input required value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/>
  <label className="field-label">קטגוריה</label><select value={form.categoryId} onChange={e=>setForm({...form,categoryId:e.target.value})}>{categories.filter(c=>c.id!=='custom').map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
  <label className="field-label">מחיר</label><input type="number" min="0" required value={form.price} onChange={e=>setForm({...form,price:e.target.value})}/>
- <input aria-label="בחירת קובץ" type="file" accept="image/jpeg,image/png,image/webp" required onChange={e=>setFile(e.target.files?.[0]||null)}/>
+ <label className="field-label" htmlFor="product-image-file">תמונת המוצר</label>
+ <FilePicker id="product-image-file" accept="image/jpeg,image/png,image/webp" required file={file} onChange={e=>setFile(e.target.files?.[0]||null)} placeholder="בחרו תמונה למוצר" />
  <button className="button primary" disabled={busy}>שמירה</button></form>}
- {screen==='covers'&&<form className="admin-product-form" onSubmit={updateCover}>
-  <h2>החלפת תמונות קטגוריות</h2>
+ {screen==='covers'&&<>
+ <form className="admin-product-form" onSubmit={updateCover}>
+  <h2>תמונות הקטגוריה</h2>
   <label className="field-label" htmlFor="cover-category">בחרי קטגוריה</label>
   <select id="cover-category" value={coverCategory} onChange={e=>{setCoverCategory(e.target.value);setCoverFile(null)}}>
    {categories.map(category=><option key={category.id} value={category.id}>{category.name}</option>)}
   </select>
-  <label className="field-label">תמונת הקטגוריה הנוכחית</label>
+  <label className="field-label">תמונה ראשית של הקטגוריה (מוצגת ברשימת הקטגוריות)</label>
   <ShopImage className="admin-category-cover-preview" src={coverPreview || categories.find(category=>category.id===coverCategory)?.image} alt="תמונת הקטגוריה" />
-  <label className="field-label" htmlFor="cover-image-file">תמונה חדשה (JPG, PNG או WebP)</label>
-  <input id="cover-image-file" key={coverCategory} type="file" accept="image/jpeg,image/png,image/webp" required onChange={e=>setCoverFile(e.target.files?.[0]||null)}/>
-  <button className="button primary" disabled={busy||!coverFile}>{busy?'שומרים…':'שמירת תמונת הקטגוריה'}</button>
- </form>}
+  <label className="field-label" htmlFor="cover-image-file">תמונה ראשית חדשה (JPG, PNG או WebP)</label>
+  <FilePicker id="cover-image-file" key={coverCategory} accept="image/jpeg,image/png,image/webp" required file={coverFile} onChange={e=>setCoverFile(e.target.files?.[0]||null)} placeholder="בחרו תמונה ראשית" />
+  <button className="button primary" disabled={busy||!coverFile}>{busy?'שומרים…':'שמירת התמונה הראשית'}</button>
+ </form>
+ {coverCategory!=='custom'&&<div className="admin-product-list admin-category-products">
+  <h3>תמונות המוצרים בקטגוריה זו</h3>
+  {products.filter(p=>p.categoryId===coverCategory).length===0
+   ? <p className="empty">עדיין אין מוצרים בקטגוריה הזאת.</p>
+   : products.filter(p=>p.categoryId===coverCategory).map(p=><div className="admin-product" key={p.id}>
+      <img src={p.image} alt=""/>
+      <div><b>{p.name}</b><small>{money(p.price)}</small></div>
+      <label className="button outline admin-inline-upload">
+       {productImageBusy===p.id?'מעלה…':'החלפת תמונה'}
+       <input type="file" accept="image/jpeg,image/png,image/webp" disabled={productImageBusy===p.id}
+        onChange={e=>{const chosen=e.target.files?.[0];e.target.value='';if(chosen)replaceProductImage(p,chosen)}}/>
+      </label>
+     </div>)}
+ </div>}
+ </>}
  {screen==='delete'&&<div><h2>מחיקת מוצר</h2><label className="field-label">קטגוריה</label><select value={category} onChange={e=>setCategory(e.target.value)}>{categories.filter(c=>c.id!=='custom').map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><div className="admin-products">{products.filter(p=>p.categoryId===category).map(p=><div className="cart-row" key={p.id}><img src={p.image} alt=""/><div className="cart-item-copy"><b>{p.name}</b><small>{money(p.price)}</small></div><button className="button outline" onClick={()=>remove(p.id)}>מחיקה</button></div>)}</div></div>}
  </section>;
 }
