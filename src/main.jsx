@@ -442,6 +442,9 @@ function Admin({ reload }) {
  const [coverCategory,setCoverCategory]=useState('yeast'),[coverFile,setCoverFile]=useState(null);
  const [coverPreview,setCoverPreview]=useState('');
  const [productImageBusy,setProductImageBusy]=useState(null);
+ const [editingId,setEditingId]=useState(null);
+ const startAdd=()=>{setEditingId(null);setForm({name:'',categoryId:'yeast',price:'',description:'',image:''});setFile(null);setScreen('add')};
+ const startEdit=p=>{setEditingId(p.id);setForm({name:p.name,categoryId:p.categoryId,price:p.price,description:p.description||'',image:p.image||''});setFile(null);setError('');setScreen('add')};
  useEffect(()=>{
   if(!coverFile){setCoverPreview('');return}
   const url=URL.createObjectURL(coverFile);
@@ -455,7 +458,14 @@ function Admin({ reload }) {
  useEffect(()=>{refresh().catch(e=>setError(e.message))},[]);
  useEffect(()=>{if(screen!=='orders')return;const interval=setInterval(()=>refresh().catch(e=>setError(e.message)),20000);return ()=>clearInterval(interval)},[screen]);
  const removeOrder=async id=>{if(!window.confirm('למחוק את ההזמנה לצמיתות?'))return;try{setError('');await deleteOrder(id);await refresh();notify('ההזמנה נמחקה בהצלחה')}catch(err){setError(err.message)}};
- const save=async e=>{e.preventDefault();setBusy(true);setError('');try{if(!file)throw Error('יש לבחור תמונה למוצר');const image=await uploadImage(file);notify('התמונה עלתה בהצלחה');await saveProduct({...form,description:form.description.trim(),image});setForm({name:'',categoryId:'yeast',price:'',description:'',image:''});setFile(null);await refresh();setScreen('home');notify('המוצר נוסף בהצלחה')}catch(err){setError(err.message)}finally{setBusy(false)}};
+ const save=async e=>{e.preventDefault();setBusy(true);setError('');try{
+  if(!file&&!(editingId&&form.image))throw Error('יש לבחור תמונה למוצר');
+  const image=file?await uploadImage(file):form.image;
+  await saveProduct({...form,description:form.description.trim(),image},editingId||undefined);
+  const wasEditing=!!editingId;
+  setForm({name:'',categoryId:'yeast',price:'',description:'',image:''});setFile(null);setEditingId(null);await refresh();setScreen(wasEditing?'edit':'home');
+  notify(wasEditing?'המוצר עודכן בהצלחה':'המוצר נוסף בהצלחה')
+ }catch(err){setError(err.message)}finally{setBusy(false)}};
  const remove=async id=>{if(!window.confirm('למחוק את המוצר?'))return;try{setError('');await disableProduct(id);await refresh();notify('המוצר נמחק בהצלחה')}catch(err){setError(err.message)}};
  const updateCover=async e=>{
   e.preventDefault();
@@ -485,12 +495,13 @@ function Admin({ reload }) {
  <AdminNotificationPrompt />
  {toast&&<div className="admin-toast" key={toast.id} role="status" aria-live="polite"><Check size={19} aria-hidden="true"/>{toast.message}</div>}
  {screen==='home'&&!installed&&<p className="admin-install-tip">להתקנה בטלפון: באנדרואיד פתחי את תפריט Chrome ובחרי ״התקנת אפליקציה״; באייפון פתחי ב־Safari, לחצי על שיתוף ואז ״הוסף למסך הבית״.</p>}
- {screen!=='home'&&<button className="button outline" onClick={()=>{setScreen('home');setError('')}}>חזרה</button>}
+ {screen!=='home'&&<button className="button outline" onClick={()=>{setScreen(screen==='add'&&editingId?'edit':'home');setEditingId(null);setError('')}}>חזרה</button>}
  {error&&<p className="error-msg">{error}</p>}
 
  {screen==='home'&&<div className="admin-three-actions">
  <button onClick={()=>setScreen('orders')}>הזמנות</button>
- <button onClick={()=>setScreen('add')}>הוספת מוצר</button>
+ <button onClick={startAdd}>הוספת מוצר</button>
+ <button onClick={()=>setScreen('edit')}>עריכת מוצר</button>
  <button onClick={()=>setScreen('delete')}>מחיקת מוצר</button>
  <button onClick={()=>setScreen('covers')}>תמונות קטגוריות</button>
  </div>}
@@ -503,15 +514,17 @@ function Admin({ reload }) {
   <div>{(o.items||[]).map((item,i)=><div key={i} className="admin-order-item"><p>{item.name} × {item.quantity}{stripOrderTypeTag(item.note)&&' — '+stripOrderTypeTag(item.note)}{stripOrderTypeTag(item.description)&&' — '+stripOrderTypeTag(item.description)}</p>{item.image&&<img src={item.image} alt="" className="admin-order-item-img"/>}</div>)}</div>
   {Boolean(o.total) && <b>{o.items?.some(item=>item.custom) ? `סכום ביניים: ${money(o.total)}` : `מחיר סופי: ${money(o.total)}`}</b>}
  </article>)}</div>}
- {screen==='add'&&<form className="admin-product-form" onSubmit={save}><h2>הוספת מוצר</h2>
+ {screen==='add'&&<form className="admin-product-form" onSubmit={save}><h2>{editingId?'עריכת מוצר':'הוספת מוצר'}</h2>
  <label className="field-label">שם מוצר</label><input required value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/>
  <label className="field-label" htmlFor="product-description">פירוט</label>
  <textarea id="product-description" rows="3" value={form.description} onChange={e=>setForm({...form,description:e.target.value})}/>
  <label className="field-label">קטגוריה</label><select value={form.categoryId} onChange={e=>setForm({...form,categoryId:e.target.value})}>{categories.filter(c=>c.id!=='custom').map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
  <label className="field-label">מחיר</label><input type="number" min="0" required value={form.price} onChange={e=>setForm({...form,price:e.target.value})}/>
  <label className="field-label" htmlFor="product-image-file">תמונת המוצר</label>
- <FilePicker id="product-image-file" accept="image/jpeg,image/png,image/webp" required file={file} onChange={e=>setFile(e.target.files?.[0]||null)} placeholder="בחרו תמונה למוצר" />
- <button className="button primary" disabled={busy}>שמירה</button></form>}
+ {editingId&&form.image&&!file&&<img className="admin-edit-current" src={form.image} alt="התמונה הנוכחית"/>}
+ <FilePicker id="product-image-file" accept="image/jpeg,image/png,image/webp" required={!editingId} file={file} onChange={e=>setFile(e.target.files?.[0]||null)} placeholder={editingId?'החלפת תמונה (לא חובה)':'בחרו תמונה למוצר'} />
+ <button className="button primary" disabled={busy}>{busy?'שומרים…':editingId?'שמירת שינויים':'שמירה'}</button></form>}
+ {screen==='edit'&&<div className="admin-edit-list"><h2>עריכת מוצר</h2><label className="field-label">קטגוריה</label><select value={category} onChange={e=>setCategory(e.target.value)}>{categories.filter(c=>c.id!=='custom').map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><div className="admin-products">{products.filter(p=>p.categoryId===category).length===0?<p className="empty">עדיין אין מוצרים בקטגוריה הזאת.</p>:products.filter(p=>p.categoryId===category).map(p=><div className="cart-row" key={p.id}><img src={p.image} alt=""/><div className="cart-item-copy"><b>{p.name}</b><small>{money(p.price)}</small>{p.description&&<small className="muted">{p.description}</small>}</div><button className="button outline" onClick={()=>startEdit(p)}>עריכה</button></div>)}</div></div>}
  {screen==='covers'&&<>
  <form className="admin-product-form" onSubmit={updateCover}>
   <h2>תמונות הקטגוריה</h2>
