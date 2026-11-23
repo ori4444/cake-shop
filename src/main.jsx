@@ -499,11 +499,13 @@ function Admin({ reload }) {
  {error&&<p className="error-msg">{error}</p>}
 
  {screen==='home'&&<div className="admin-three-actions">
- <button onClick={()=>setScreen('orders')}>הזמנות</button>
- <button onClick={startAdd}>הוספת מוצר</button>
- <button onClick={()=>setScreen('edit')}>עריכת מוצר</button>
- <button onClick={()=>setScreen('delete')}>מחיקת מוצר</button>
- <button onClick={()=>setScreen('covers')}>תמונות קטגוריות</button>
+ {[
+  ['הזמנות',ClipboardList,()=>setScreen('orders')],
+  ['הוספת מוצר',Plus,startAdd],
+  ['עריכת מוצר',Pencil,()=>setScreen('edit')],
+  ['מחיקת מוצר',Trash2,()=>setScreen('delete')],
+  ['תמונות קטגוריות',ImagePlus,()=>setScreen('covers')],
+ ].map(([label,Icon,go])=><button key={label} onClick={go}><span className="admin-action-icon"><Icon size={18} aria-hidden="true"/></span><span className="admin-action-label">{label}</span><ArrowLeft size={16} className="admin-action-arrow" aria-hidden="true"/></button>)}
  </div>}
  {screen==='orders'&&<div><h2>הזמנות</h2>{orders.length===0?<p>אין הזמנות עדיין</p>:orders.map(o=><article key={o.id} className="admin-order">
   <div className="admin-order-head"><h3>{o.customer_name} — {o.phone}</h3>
