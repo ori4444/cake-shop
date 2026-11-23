@@ -7,6 +7,7 @@ import {
   Pencil, Save, Cookie,
 } from 'lucide-react';
 import { categories, applyCategoryImages, customCakeImages, initialProducts, money } from './data';
+import { loadCartSync, loadNewerCart, saveCart, requestPersistentStorage } from './cartStore';
 import { getProducts, getCategoryImages, saveCategoryImage, getOrders, deleteOrder, saveProduct, disableProduct, uploadImage, placeOrder } from './supabase';
 import './styles.css';
 
@@ -24,13 +25,28 @@ function useShop() {
 
 function App() {
   const shop = useShop();
-  const [cart, setCart] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('cake-cart')) || []; } catch { return []; }
-  });
+  const [cart, setCart] = useState(loadCartSync);
+  const cartRef = React.useRef(cart);
+  const touched = React.useRef(false);
   const [drawer, setDrawer] = useState(false);
-  useEffect(() => localStorage.setItem('cake-cart', JSON.stringify(cart, (key, value) => key === 'file' ? undefined : value)), [cart]);
+  // Restore from IndexedDB if it holds a newer copy (e.g. localStorage write was lost when the app was closed).
+  useEffect(() => {
+    requestPersistentStorage();
+    loadNewerCart().then(items => { if (items && !touched.current) setCart(items); });
+  }, []);
+  useEffect(() => { cartRef.current = cart; }, [cart]);
+  const updateCart = next => { touched.current = true; setCart(next); };
+  useEffect(() => { if (touched.current) saveCart(cart); }, [cart]);
+  // Save again the moment the app is hidden or closed.
+  useEffect(() => {
+    const flush = () => { if (touched.current) saveCart(cartRef.current); };
+    const onVisibility = () => { if (document.visibilityState === 'hidden') flush(); };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', flush);
+    return () => { document.removeEventListener('visibilitychange', onVisibility); window.removeEventListener('pagehide', flush); };
+  }, []);
 
-  const addToCart = item => setCart(current => {
+  const addToCart = item => updateCart(current => {
     const index = current.findIndex(x => x.type !== 'custom' && x.productId && x.productId === item.productId && x.note === item.note && x.type === item.type);
     if (index < 0) return [...current, { ...item, key: item.key || crypto.randomUUID() }];
     const next = [...current];
@@ -38,8 +54,8 @@ function App() {
     return next;
   });
 
-  const removeFromCart = key => setCart(current => current.filter(item => item.key !== key));
-  const changeQuantity = (key, delta) => setCart(current => current.map(item =>
+  const removeFromCart = key => updateCart(current => current.filter(item => item.key !== key));
+  const changeQuantity = (key, delta) => updateCart(current => current.map(item =>
     item.key === key ? { ...item, quantity: Math.max(1, item.quantity + delta) } : item));
   const count = cart.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -47,7 +63,7 @@ function App() {
     
     <main className="main">
       {!ADMIN_SITE && <CustomerBack products={shop.products} />}
-      <RoutesView {...shop} cart={cart} setCart={setCart} addToCart={addToCart}
+      <RoutesView {...shop} cart={cart} setCart={updateCart} addToCart={addToCart}
         removeFromCart={removeFromCart} changeQuantity={changeQuantity} />
     </main>
     {!ADMIN_SITE && <Footer />}
